@@ -122,8 +122,9 @@ def capture(args) -> dict:
         out[f"{mode}_fw"], out[f"{mode}_mw"], out[f"{mode}_fn"], out[f"{mode}_mn"] = fw, mw, fn, mn
         fund = mw[(fw > args.carrier - 2e5) & (fw < args.carrier + 2e5)].max()
         harm = [mw[(fw > k * args.carrier - 2e5) & (fw < k * args.carrier + 2e5)].max() for k in (2, 3, 4)]
-        print(f"{mode:4}: carrier {fund:6.1f} dBm, H2..H4 {harm[0]:6.1f} {harm[1]:6.1f} {harm[2]:6.1f} dBm,"
-              f" floor {np.median(mw):6.1f} dBm", flush=True)
+        h2, h3, h4 = harm
+        print(f"{mode:4}: carrier {fund:6.1f} dBm, H2..H4 {h2:6.1f} {h3:6.1f} {h4:6.1f} dBm, "
+              f"floor {np.median(mw):6.1f} dBm", flush=True)
     ctl(args.port, "disable", "1")
     return out
 
