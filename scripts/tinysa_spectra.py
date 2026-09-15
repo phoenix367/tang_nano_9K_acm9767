@@ -109,7 +109,8 @@ def capture(args) -> dict:
     for mode in args.modes:
         proc = None
         if mode == "sine":
-            ctl(args.port, "set", "1", "--freq", str(args.carrier), "--wave", "sine", "--amp", "1.0", "--offset", "0")
+            ctl(args.port, "set", "1", "--freq", str(args.carrier), "--wave", "sine",
+                "--amp", "1.0", "--offset", "0")
             ctl(args.port, "enable", "1")
         else:
             ctl(args.port, "set", "1", "--freq", str(args.carrier), "--wave",
