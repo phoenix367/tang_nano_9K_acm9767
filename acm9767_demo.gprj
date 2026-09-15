@@ -1,0 +1,28 @@
+<?xml version="1" encoding="UTF-8"?>
+<!DOCTYPE gowin-fpga-project>
+<Project>
+    <Template>FPGA</Template>
+    <Version>5</Version>
+    <Device name="GW1NR-9C" pn="GW1NR-LV9QN88PC6/I5">gw1nr9c-004</Device>
+    <FileList>
+        <File path="src/acm9767_top.v" type="file.verilog" enable="1"/>
+        <File path="src/acm9767_defs.vh" type="file.verilog" enable="1"/>
+        <File path="src/platform_config.vh" type="file.verilog" enable="1"/>
+        <File path="src/timescale.v" type="file.verilog" enable="1"/>
+        <File path="src/dac_pll.v" type="file.verilog" enable="1"/>
+        <File path="src/reset_sync.sv" type="file.verilog" enable="1"/>
+        <File path="src/cdc_commit_sync.sv" type="file.verilog" enable="1"/>
+        <File path="src/uart.sv" type="file.verilog" enable="1"/>
+        <File path="src/modbus_rtu_slave.sv" type="file.verilog" enable="1"/>
+        <File path="src/dac_regs.sv" type="file.verilog" enable="1"/>
+        <File path="src/async_fifo.sv" type="file.verilog" enable="1"/>
+        <File path="src/hilbert_fir.sv" type="file.verilog" enable="1"/>
+        <File path="src/cic_interp.sv" type="file.verilog" enable="1"/>
+        <File path="src/envelope_limiter.sv" type="file.verilog" enable="1"/>
+        <File path="src/ssb_baseband.sv" type="file.verilog" enable="1"/>
+        <File path="src/dds_channel.sv" type="file.verilog" enable="1"/>
+        <File path="src/dac_output_stage.sv" type="file.verilog" enable="1"/>
+        <File path="src/acm9767.cst" type="file.cst" enable="1"/>
+        <File path="src/acm9767.sdc" type="file.sdc" enable="1"/>
+    </FileList>
+</Project>

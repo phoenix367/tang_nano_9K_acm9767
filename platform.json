@@ -1,0 +1,36 @@
+{
+  "clock": {
+    "sys_clk_hz": 27000000
+  },
+  "pll": {
+    "idiv": 1,
+    "fbdiv": 2,
+    "odiv": 16
+  },
+  "dac": {
+    "bits": 14,
+    "channels": 1,
+    "sine_lut_depth": 4096
+  },
+  "modbus": {
+    "device_id": 7,
+    "addr_limit": "0x180",
+    "max_read_qty": 32,
+    "max_frame": 208
+  },
+  "uart": {
+    "baud": 1000000,
+    "data_bits": 8,
+    "parity": "even",
+    "stop_bits": 1
+  },
+  "ssb": {
+    "audio_rate_hz": 16000,
+    "hilbert_taps": 127,
+    "fifo_depth": 2048,
+    "dc_block_shift": 7,
+    "limiter_lookahead": 8,
+    "limiter_threshold": 31000,
+    "limiter_release": 32
+  }
+}

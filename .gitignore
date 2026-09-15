@@ -1,0 +1,11 @@
+build/
+impl/
+*.user
+src/platform_config.vh
+src/acm9767.sdc
+sim/Testing/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.vcd

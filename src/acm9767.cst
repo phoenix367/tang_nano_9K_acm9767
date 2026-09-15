@@ -1,0 +1,104 @@
+// Physical constraints: Tang Nano 9K (GW1NR-LV9QN88PC6/I5) -> ACM9767 DAC module.
+//
+// Every DAC signal sits on a BANK1/BANK2 (3.3 V) header pin: the AD9767's
+// digital inputs run at DVDD = 3.3 V and need VIH >= 2.1 V, so the 1.8 V BANK3
+// pins (79-86) must NOT be used for the DAC bus. Pin numbers are the FPGA pin
+// numbers printed on the Tang Nano 9K header silkscreen.
+//
+// Wiring the ACM9767's 40-pin header to these pins is jumper wire, so the
+// assignment is arbitrary: to remap, edit the IO_LOC lines below and rebuild
+// (doc/wiring.md has the same table). Only channel 1 is wired
+// (platform.json dac.channels = 1): data + CLK1 + WRT1 run down the left header
+// in physical order. The channel-2 block at the bottom is kept commented out;
+// set dac.channels = 2 and uncomment it to bring DA2 back.
+
+// ---- board fixed resources ----
+IO_LOC "sys_clk" 52;
+IO_PORT "sys_clk" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
+IO_LOC "sys_rst_n" 4;
+IO_PORT "sys_rst_n" PULL_MODE=UP BANK_VCCIO=1.8;
+IO_LOC "uart_tx" 17;
+IO_PORT "uart_tx" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "uart_rx" 18;
+IO_PORT "uart_rx" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
+IO_LOC "leds[0]" 10;
+IO_PORT "leds[0]" PULL_MODE=UP DRIVE=8 BANK_VCCIO=1.8;
+IO_LOC "leds[1]" 11;
+IO_PORT "leds[1]" PULL_MODE=UP DRIVE=8 BANK_VCCIO=1.8;
+IO_LOC "leds[2]" 13;
+IO_PORT "leds[2]" PULL_MODE=UP DRIVE=8 BANK_VCCIO=1.8;
+IO_LOC "leds[3]" 14;
+IO_PORT "leds[3]" PULL_MODE=UP DRIVE=8 BANK_VCCIO=1.8;
+IO_LOC "leds[4]" 15;
+IO_PORT "leds[4]" PULL_MODE=UP DRIVE=8 BANK_VCCIO=1.8;
+IO_LOC "leds[5]" 16;
+IO_PORT "leds[5]" PULL_MODE=UP DRIVE=8 BANK_VCCIO=1.8;
+
+// ---- DAC channel 1 (left header, physical order 25 26 27 28 29 30 33 34 40 35 41 42 51 53 | 54 55) ----
+IO_LOC "da1_data[0]" 25;
+IO_PORT "da1_data[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "da1_data[1]" 26;
+IO_PORT "da1_data[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "da1_data[2]" 27;
+IO_PORT "da1_data[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "da1_data[3]" 28;
+IO_PORT "da1_data[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "da1_data[4]" 29;
+IO_PORT "da1_data[4]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "da1_data[5]" 30;
+IO_PORT "da1_data[5]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "da1_data[6]" 33;
+IO_PORT "da1_data[6]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "da1_data[7]" 34;
+IO_PORT "da1_data[7]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "da1_data[8]" 40;
+IO_PORT "da1_data[8]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "da1_data[9]" 35;
+IO_PORT "da1_data[9]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "da1_data[10]" 41;
+IO_PORT "da1_data[10]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "da1_data[11]" 42;
+IO_PORT "da1_data[11]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "da1_data[12]" 51;
+IO_PORT "da1_data[12]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "da1_data[13]" 53;
+IO_PORT "da1_data[13]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "da1_clk" 54;
+IO_PORT "da1_clk" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "da1_wrt" 55;
+IO_PORT "da1_wrt" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+
+// ---- DAC channel 2 (only when platform.json dac.channels = 2) ----
+// Physical order: left header bottom 56 57 68 69, then right header 70..77, 48 49, 63.
+// IO_LOC "da2_data[0]" 56;
+// IO_PORT "da2_data[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// IO_LOC "da2_data[1]" 57;
+// IO_PORT "da2_data[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// IO_LOC "da2_data[2]" 68;
+// IO_PORT "da2_data[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// IO_LOC "da2_data[3]" 69;
+// IO_PORT "da2_data[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// IO_LOC "da2_data[4]" 70;
+// IO_PORT "da2_data[4]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// IO_LOC "da2_data[5]" 71;
+// IO_PORT "da2_data[5]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// IO_LOC "da2_data[6]" 72;
+// IO_PORT "da2_data[6]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// IO_LOC "da2_data[7]" 73;
+// IO_PORT "da2_data[7]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// IO_LOC "da2_data[8]" 74;
+// IO_PORT "da2_data[8]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// IO_LOC "da2_data[9]" 75;
+// IO_PORT "da2_data[9]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// IO_LOC "da2_data[10]" 76;
+// IO_PORT "da2_data[10]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// IO_LOC "da2_data[11]" 77;
+// IO_PORT "da2_data[11]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// IO_LOC "da2_data[12]" 48;
+// IO_PORT "da2_data[12]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// IO_LOC "da2_data[13]" 49;
+// IO_PORT "da2_data[13]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// IO_LOC "da2_clk" 63;
+// IO_PORT "da2_clk" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// IO_LOC "da2_wrt" 31;
+// IO_PORT "da2_wrt" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
