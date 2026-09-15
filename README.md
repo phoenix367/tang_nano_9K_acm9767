@@ -115,6 +115,38 @@ below -60 dBc, the 1 MHz-spaced quantisation comb below -70 dBc across the
 band, and the demodulated baseband overlaying the input. Reproduce with
 `scripts/ssb_loopback.py` followed by `scripts/plot_spectrum.py`.*
 
+### Measured spectra
+
+Real output of the board (2026-09-16 build) into a tinySA Ultra, direct
+connection, the module's output gain trimmer turned down so that a
+full-amplitude sine gives about +2 dBm into 50 Ω (with the trimmer at maximum
+the module's op-amp stage compresses: -18 dBc second harmonic at 7 MHz).
+Max-hold over eight sweeps per trace; the voice is a 16 kHz mono recording
+looped at `--level 1.0`, so the SSB and AM traces include the limiter and the
+start/stop of every pass. Captured and plotted with `scripts/tinysa_spectra.py`.
+
+![Measured 4-30 MHz spectra: sine, SSB voice, AM voice, NFM voice](doc/images/measured_spectra_4_30mhz.png)
+
+| mode, 7.1 MHz carrier | carrier | H2 (14.2 MHz) | H3 (21.3 MHz) | H4 (28.4 MHz) |
+| --- | --- | --- | --- | --- |
+| sine, full amplitude | +2 dBm | -46 dBm (-48 dBc) | -52 dBm (-54 dBc) | -56 dBm (-58 dBc) |
+| SSB voice, level 1.0 | -3 dBm peak | at the floor | at the floor | at the floor |
+| AM voice, depth 0.8 | -4 dBm | -56 dBm | at the floor | at the floor |
+| NFM voice, 5 kHz | +2 dBm | -46 dBm (-48 dBc) | -51 dBm | -56 dBm |
+
+The floor is the analyser's with its input attenuator engaged (about
+-62 dBm at 300 kHz RBW), so the SSB and AM harmonics are below it: the
+limiter keeps the envelope under full scale and nothing is clipped. NFM is a
+constant-envelope signal, so it shows exactly the full-amplitude sine's
+residual harmonics.
+
+![Measured spectra within 15 kHz of the carrier](doc/images/measured_spectra_carrier_30khz.png)
+
+Within ±15 kHz (1 kHz RBW): the sine's shoulders at ±4 kHz are the
+analyser's own filter skirt; SSB voice occupies 0 to +3.4 kHz only, the
+lower side and the carrier staying 40 dB or more down; AM shows the carrier
+with symmetric sidebands; NFM spreads over about ±7 kHz.
+
 `set` writes the channel block with one FC10 and commits; `--no-commit`
 stages only. `stream` resamples the audio to the device's rate (register
 0x0A), pushes 96-sample FC16 blocks into the FIFO window while pacing on

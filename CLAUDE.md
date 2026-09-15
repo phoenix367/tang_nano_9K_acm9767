@@ -27,6 +27,7 @@ cmake -S . -B build -D IVerilog_PATH=/usr/bin -D Gowin_PATH=/mnt/data/Gowin_V1.9
 | time-domain plot of a loopback dump | `scripts/plot_dac_samples.py --workdir build/loopback/<run> --carrier 7e6 -o doc/images/x.png` |
 | waterfall of a loopback dump | `scripts/plot_waterfall.py --workdir build/loopback/<run> --carrier 7e6 -o doc/images/x.png` (complex baseband around the carrier; make a moving signal with `ssb_loopback.py --sweep 300,2600 --tones 800 --seconds 0.08`) |
 | spectrum plot of a loopback dump | `scripts/plot_spectrum.py --workdir build/loopback/<run> --carrier 7e6 --mode usb -o doc/images/x.png` (matplotlib) |
+| measured spectra (tinySA on the DAC output) | `scripts/tinysa_spectra.py --wav voice.wav -o build/spectra.npz` then `--plot build/spectra.npz --out-dir doc/images` (README figures; needs pyserial + numpy + matplotlib, analyser input < +6 dBm) |
 | host tests | `python -m pytest scripts/tests -q` (no hardware; FakeSlave) |
 | lint Python | `ruff check .` |
 | talk to the board | `scripts/acm9767_ctl.py status` / `set 1 --freq 1e6 --wave sine` / `enable 1` / `stream --carrier 7.1e6 --tone 1000` (needs pyserial, `/dev/ttyGowin` from `udev/`) |
