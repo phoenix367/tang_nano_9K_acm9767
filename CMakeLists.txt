@@ -59,7 +59,16 @@ find_program(GOWIN_PROGRAMMER programmer_cli HINTS "${GOWIN_ROOT}/Programmer/bin
 if (GOWIN_PROGRAMMER)
     message(STATUS "Found Gowin programmer at ${GOWIN_PROGRAMMER}")
 else()
-    message(STATUS "Gowin programmer_cli not found - hw_program targets disabled")
+    message(STATUS "Gowin programmer_cli not found - hw_program (SRAM) target disabled")
+endif()
+# openFPGALoader writes the embedded flash (programmer_cli's embFlash operations
+# fail or hang on this board, see CLAUDE.md "Hardware status").
+find_program(OPENFPGALOADER openFPGALoader)
+set(OPENFPGALOADER_BOARD "tangnano9k" CACHE STRING "openFPGALoader -b board name for hw_program_flash")
+if (OPENFPGALOADER)
+    message(STATUS "Found openFPGALoader at ${OPENFPGALOADER} (board ${OPENFPGALOADER_BOARD})")
+else()
+    message(STATUS "openFPGALoader not found - hw_program_flash target disabled")
 endif()
 
 set(SRC_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -320,18 +329,24 @@ foreach(_stage synth impl all)
     )
 endforeach()
 
-# Programming targets. programmer_cli operation indices (see --help):
-#   2 = SRAM Program (volatile), 6 = embFlash Erase, Program, Verify (persistent).
+# Programming targets.
+#   hw_program:       programmer_cli --run 2 = SRAM Program (volatile).
+#   hw_program_flash: openFPGALoader -f writes the embedded flash (erases SRAM
+#                     too, checks the CRC) but does not restart the FPGA, so a
+#                     second call with --reset makes it boot from the flash.
+set(BITSTREAM_FILE "${CMAKE_CURRENT_SOURCE_DIR}/impl/pnr/acm9767_demo.fs")
 if (GOWIN_PROGRAMMER)
-    set(BITSTREAM_FILE "${CMAKE_CURRENT_SOURCE_DIR}/impl/pnr/acm9767_demo.fs")
     add_custom_target(hw_program
         COMMAND ${GOWIN_PROGRAMMER} --device GW1NR-9C --run 2 --fsFile ${BITSTREAM_FILE}
         COMMENT "Loading bitstream into SRAM (volatile)"
         USES_TERMINAL
     )
+endif()
+if (OPENFPGALOADER)
     add_custom_target(hw_program_flash
-        COMMAND ${GOWIN_PROGRAMMER} --device GW1NR-9C --run 6 --fsFile ${BITSTREAM_FILE}
-        COMMENT "Programming embedded flash (persistent)"
+        COMMAND ${OPENFPGALOADER} -b ${OPENFPGALOADER_BOARD} -f ${BITSTREAM_FILE}
+        COMMAND ${OPENFPGALOADER} -b ${OPENFPGALOADER_BOARD} --reset
+        COMMENT "Writing embedded flash with openFPGALoader (persistent), then booting from it"
         USES_TERMINAL
     )
 endif()

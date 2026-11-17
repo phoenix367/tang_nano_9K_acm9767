@@ -47,6 +47,7 @@ are the UART and Modbus RTU slave cores.
 | Component                    | Notes                                                             |
 | ---------------------------- | ----------------------------------------------------------------- |
 | Gowin EDA `V1.9.12.x` Linux  | IDE + Programmer. Needed even for simulation (`simlib/gw1n/prim_tsim.v`) |
+| openFPGALoader 0.12+         | `hw_program_flash` (embedded flash); `apt install openfpgaloader` |
 | Icarus Verilog 12+           | `apt install iverilog`                                            |
 | CMake 3.16+                  | `apt install cmake`                                               |
 | Python 3.10+ (+ pyserial)    | host CLI; `pip install -r scripts/requirements.txt`               |
@@ -59,7 +60,7 @@ cmake --build build                 # compile every testbench
 (cd build && ctest)                 # run the simulation suite
 cmake --build build --target hw_all       # synthesis + PnR + bitstream -> impl/pnr/acm9767_demo.fs
 cmake --build build --target hw_program   # load into SRAM (volatile)
-cmake --build build --target hw_program_flash   # persist in embedded flash
+cmake --build build --target hw_program_flash   # persist in embedded flash (openFPGALoader), then boot from it
 ```
 
 `Gowin_PATH` must be the IDE folder (the one with `bin/GowinSynthesis` and
