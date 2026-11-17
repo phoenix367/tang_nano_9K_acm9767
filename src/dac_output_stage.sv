@@ -21,8 +21,8 @@
 //   pin goes through an OSER4 clocked by fclk = 2 * clk (CLKDIV /2 of the same
 //   rPLL output). OSER4 sends D0, D1, D2, D3 in that order, DDR on fclk, i.e.
 //   4 slots of half an fclk period per clk: each data bit is sent twice
-//   ({b0, b0, b1, b1}) so a sample lasts 2 slots = one fclk period (9.26 ns at
-//   108 MS/s), and CLK / WRT are the 2-slot patterns {1,0} / {0,1} per sample,
+//   ({b0, b0, b1, b1}) so a sample lasts 2 slots = one fclk period (8.9 ns at
+//   112.5 MS/s), and CLK / WRT are the 2-slot patterns {1,0} / {0,1} per sample,
 //   giving the same edge relationships as the ODDR version at twice the rate.
 //   Every pin uses the same serializer path, so the CLK/WRT-to-data alignment
 //   is structural (no PLL phase relationship involved). All OSER4s leave reset

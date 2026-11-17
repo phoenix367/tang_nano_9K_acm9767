@@ -6,7 +6,7 @@
 `include "test_config.sv"
 
 // End-to-end SSB quality test in the dac_clk domain with the real platform
-// constants (16 kS/s audio, x3375 CIC, 127-tap Hilbert): ssb_baseband fed from
+// constants (platform audio rate and CIC ratio, 127-tap Hilbert): ssb_baseband fed from
 // a testbench FIFO model with a 2 kHz tone, feeding dds_channel (with the
 // platform's samples_per_clock, every sample of every lane is analysed) in
 // WAVE_SSB_USB / WAVE_SSB_LSB on an f_dac/32 carrier. Hann-windowed Goertzel

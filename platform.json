@@ -3,8 +3,8 @@
     "sys_clk_hz": 27000000
   },
   "pll": {
-    "idiv": 1,
-    "fbdiv": 4,
+    "idiv": 6,
+    "fbdiv": 25,
     "odiv": 8
   },
   "dac": {
@@ -26,7 +26,7 @@
     "stop_bits": 1
   },
   "ssb": {
-    "audio_rate_hz": 16000,
+    "audio_rate_hz": 15625,
     "hilbert_taps": 127,
     "fifo_depth": 2048,
     "dc_block_shift": 7,

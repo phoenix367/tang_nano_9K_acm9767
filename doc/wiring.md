@@ -52,7 +52,7 @@ and WRT1 run down the left header in physical order.
 `da1_wrt` is the AD9767's WRT1 input-latch strobe. The gateware drives WRT1
 as the inverted sample clock (data is centred on its rising edge) and CLK1 as
 the non-inverted clock, so CLK1 rises half a sample *before* WRT1 (4.6 ns at
-the default 108 MS/s, 9.3 ns at 54 MS/s). That keeps the pair clear of the
+the default 112.5 MS/s, 4.6 ns at 108 MS/s, 9.3 ns at 54 MS/s). That keeps the pair clear of the
 datasheet's forbidden window (CLK must not rise 0..2 ns after WRT) regardless
 of lead-length or driver skew; the DAC latch then takes the previous
 input-latch word, one sample of extra latency. If the module ties
@@ -76,18 +76,18 @@ any other 3.3 V pins), and rebuild. Free 3.3 V pins on the 1-channel build:
   If a sawtooth ramps the wrong way on the scope, set the channel's invert
   bit (`acm9767_ctl.py invert 1 --on`) -- no rebuild needed.
 * **Clocking**: every DAC pin (data, CLK, WRT) is driven by an OSER4
-  serializer clocked at the sample rate (108 MHz, DDR), fed two samples per
-  54 MHz logic clock; each data bit is sent for two half-periods, CLK as `1,0`
+  serializer clocked at the sample rate (112.5 MHz, DDR), fed two samples per
+  56.25 MHz logic clock; each data bit is sent for two half-periods, CLK as `1,0`
   and WRT as `0,1` per sample (`dac_output_stage.sv`). So the data changes
   with CLK's rising edge and WRT rises mid-way between data transitions:
-  4.6 ns of nominal setup and hold at 108 MS/s against the AD9767's 2.0 / 1.5
-  ns minimums, i.e. ~2.6 ns / ~3.1 ns of margin for driver skew, edge time
-  and lead mismatch together. `dac.samples_per_clock = 1` (with `pll.fbdiv` 2,
-  `pll.odiv` 16) restores the 54 MS/s ODDR build: one sample per clock, 9.3 ns
-  either side.
+  4.4 ns of nominal setup and hold at 112.5 MS/s against the AD9767's 2.0 / 1.5
+  ns minimums, i.e. ~2.4 ns / ~2.9 ns of margin for driver skew, edge time
+  and lead mismatch together. `dac.samples_per_clock = 1` (with `pll.idiv` 1,
+  `pll.fbdiv` 2, `pll.odiv` 16) restores the 54 MS/s ODDR build: one sample per
+  clock, 9.3 ns either side.
 * **Lead lengths**: at 54 MS/s the budget tolerated about ±5 ns (±1 m) of
-  clock-vs-data mismatch; at 108 MS/s it is about ±2.5 ns *before* edge
-  times, and WRT/CLK are 108 MHz square waves with only 4.6 ns between edges,
+  clock-vs-data mismatch; at 112.5 MS/s it is about ±2.4 ns *before* edge
+  times, and WRT/CLK are 112.5 MHz square waves with only 4.4 ns between edges,
   so ringing on an unterminated jumper can double-clock the DAC. The FPGA
   has no on-chip series resistor (`SINGLE_RESISTOR` / `DIFF_RESISTOR` are the
   100 Ohm *input* termination of banks 1/3, and the GW1NR-9 flow ignores
@@ -98,14 +98,16 @@ any other 3.3 V pins), and rebuild. Free 3.3 V pins on the 1-channel build:
   4-18). Keep every lead under ~10 cm and of similar length, and run ground
   returns next to WRT/CLK and every few data lines; with longer wiring add
   external 22-33 Ohm series resistors at the FPGA end of CLK and WRT on top.
-  If the output shows sparkle codes or a garbled spectrum at 108 MS/s that the
+  If the output shows sparkle codes or a garbled spectrum at 112.5 MS/s that the
   54 MS/s build does not, the wiring is the first suspect -- try `DRIVE=8`
   (if the edges are too slow), go back to `samples_per_clock = 1`, or build a
   proper adapter board.
 * **Sample rate**: `platform.json` `pll.fbdiv`/`pll.idiv` set the DAC sample
-  rate `f_dac = 27 MHz * fbdiv / idiv` (default 108 MS/s = 27 x 4, PFD
+  rate `f_dac = 27 MHz * fbdiv / idiv` (default 112.5 MS/s = 27 x 25 / 6, PFD 4.5 MHz,
+  VCO 900 MHz; 108 MS/s = 27 x 4, PFD
   27 MHz, VCO 864 MHz); the logic clock `dac_clk` is f_dac /
-  `dac.samples_per_clock`. The bitstream reports f_dac in registers 0x05/0x06
+  `dac.samples_per_clock`, and `ssb.audio_rate_hz` must divide it exactly
+  (15625 Hz divides 56.25 MHz and 54 MHz, so it works for all three builds). The bitstream reports f_dac in registers 0x05/0x06
   so the host CLI computes tuning words against the real rate.
 
 ## Board resources used by the gateware

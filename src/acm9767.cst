@@ -16,7 +16,7 @@
 // is set by the drive strength (Gowin IBIS: ~48 ohm at 4 mA, ~24 at 8 mA, ~16
 // at 12 mA), so 4 mA acts as an on-chip series termination for the jumper
 // wiring -- about what 8 mA + an external 33 ohm gives -- and DS100 Table 4-18
-// still guarantees 150 MHz toggling at 4 mA into 30 pF (CLK/WRT run at 108 MHz).
+// still guarantees 150 MHz toggling at 4 mA into 30 pF (CLK/WRT run at 112.5 MHz).
 // Keep all DAC pins at the same drive so the clock and data driver delays
 // match. There is no other output knob: SINGLE_RESISTOR / DIFF_RESISTOR are the
 // banks 1/3 *input* termination (100 ohm differential), and SLEW_RATE is

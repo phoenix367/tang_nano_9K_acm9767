@@ -3,7 +3,7 @@
 
 Panels: the whole run (DAC codes with the modulation envelope and the input
 audio), a zoom on the envelope beating, and a zoom down to individual DAC samples
-(108 MS/s by default) on the carrier.
+(112.5 MS/s by default) on the carrier.
 
     scripts/plot_dac_samples.py --workdir build/loopback/7mhz_usb_4k --carrier 7e6 -o doc/images/x.png
 """

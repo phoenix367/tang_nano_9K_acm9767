@@ -45,7 +45,7 @@ DC_SHIFT = getattr(pc, "SSB_DC_BLOCK_SHIFT", 0)   # the modulator's DC blocker l
 TONES = [(400.0, 0.25), (1000.0, 0.35), (1700.0, 0.20), (2600.0, 0.20)]   # Hz, fraction of level
 PAD = 256          # silence samples before/after the audio so the FIR/CIC start and end in a defined state
 AUDIO_BW = 5000.0
-DEFAULT_CARRIER = FS_DAC / 32          # 3.375 MHz at 108 MS/s
+DEFAULT_CARRIER = FS_DAC / 32          # 3.516 MHz at 112.5 MS/s
 DEFAULT_DEVIATION = 5000.0
 DEFAULT_DEPTH = 0.8
 

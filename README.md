@@ -9,16 +9,18 @@ host control over the board's USB UART using Modbus RTU.
   square with programmable duty, or DC; 32-bit frequency tuning word
   (sub-Hz resolution), 16-bit phase offset, amplitude, signed DC offset and
   per-channel polarity inversion.
-* 108 MS/s DAC sample rate from the on-chip PLL (set in `platform.json`):
-  the logic runs at 54 MHz and computes two samples per clock, and OSER4
-  serializers send them to the module at 108 MHz, with CLK and WRT coming out
+* 112.5 MS/s DAC sample rate (Nyquist 56.25 MHz) from the on-chip PLL (27 MHz
+  x 25 / 6, set in `platform.json`): the logic runs at 56.25 MHz and computes
+  two samples per clock, and OSER4 serializers send them to the module at
+  112.5 MHz, with CLK and WRT coming out
   of the same serializers so the data transitions are centred on the WRT
   latch edge and CLK is half a sample ahead of it. `dac.samples_per_clock = 1`
   builds the one-sample-per-clock 54 MS/s ODDR version instead (bit-identical
-  datapath, a fallback for long wiring).
+  datapath, a fallback for long wiring); 108 MS/s (27 x 4) is the other
+  two-sample option.
 * Modbus RTU slave on `/dev/ttyGowin` (1 Mbaud 8-E-1, id 7); all channel
   settings are staged in holding registers and applied atomically by a COMMIT.
-* **SSB, AM and FM modulation of audio streamed from the PC**: 16 kS/s 16-bit samples go
+* **SSB, AM and FM modulation of audio streamed from the PC**: 15.625 kS/s 16-bit samples go
   over the same Modbus link into a 2048-sample FIFO; a 127-tap Hilbert
   transformer + 3-stage CIC interpolator build the analytic baseband, mixed
   onto channel 1's DDS carrier (USB or LSB); the same baseband also drives AM
@@ -32,7 +34,7 @@ host control over the board's USB UART using Modbus RTU.
   the real top level with the Gowin PLL/CLKDIV/OSER4 models), driven by CTest; host
   tests with pytest against a fake slave; and a **modulator-to-demodulator
   loopback** (`ctest -L loopback`): the real modulator chain is simulated on
-  a binary audio file, its 108 MS/s DAC codes are dumped as binary and decoded
+  a binary audio file, its 112.5 MS/s DAC codes are dumped as binary and decoded
   by an analytic-signal demodulator in Python (`scripts/ssb_loopback.py`),
   which scores SNR, sideband and carrier suppression for USB/LSB/AM/FM.
 
@@ -62,7 +64,7 @@ cmake --build build --target hw_program_flash   # persist in embedded flash
 
 `Gowin_PATH` must be the IDE folder (the one with `bin/GowinSynthesis` and
 `simlib/`). The four `loopback_*` tests take ~4 min each with `-j4` (they
-simulate 40 ms of audio, 8.7 M DAC samples at 108 MS/s, and score them with
+simulate 40 ms of audio, 9.2 M DAC samples at 112.5 MS/s, and score them with
 FFTs of that length, ~1-1.5 GB RAM each); `ctest -LE loopback` runs the quick
 suite (~4 min, dominated by `integration_top_ssb_stream`). Run
 one by hand, e.g. with a real recording and the recovered audio written out:
@@ -159,7 +161,7 @@ stages only. `stream` resamples the audio to the device's rate (register
 FIFO_LEVEL, and reports underruns at the end. The modulator removes DC from the audio, fades a (re)started stream in over 64 ms and limits the SSB envelope just below full scale, so `--level` is a loudness setting rather than a clipping margin (a hot recording is limited, not clipped); `--carrier` switches channel 1
 to the `--mode` (usb, lsb, am, fm/nfm) on that carrier and enables it first. Audio bandwidth
 is ~300 Hz .. 5 kHz (Hilbert transformer + CIC droop, -1.5 dB at 3 kHz);
-carriers up to ~40 MHz fit the default 108 MS/s (the module's analogue stage
+carriers up to ~40 MHz fit the default 112.5 MS/s (the module's analogue stage
 has only been measured up to 30 MHz). The tool reads the DAC sample clock from the device (registers
 0x05/0x06) to compute tuning words, so it follows whatever `platform.json`
 the bitstream was built with.
@@ -180,7 +182,7 @@ the bitstream was built with.
 | 0x07 | CHANNELS    | R   | DAC channels wired in this bitstream (1 or 2)                  |
 | 0x08 | FIFO_LEVEL  | R   | audio samples buffered                                         |
 | 0x09 | UNDERRUNS   | R/W | audio ticks that found the FIFO empty; any write clears        |
-| 0x0A | AUDIO_RATE  | R   | baseband sample rate, Hz (16000)                               |
+| 0x0A | AUDIO_RATE  | R   | baseband sample rate, Hz (15625)                               |
 | 0x0B | FIFO_DEPTH  | R   | FIFO capacity in samples (2048)                                |
 | 0x100-0x17F | AUDIO | W  | FIFO write window: every register written pushes one signed 16-bit sample (FC16 streams a block) |
 | 0x10 | CH1 block   | RW* | channel 1, 7 registers (below)                                 |
@@ -194,9 +196,9 @@ sideband, 7 AM, 8 FM -- modes 5..8 use the channel's FTW as the carrier and the
 streamed audio as baseband), +6 `DUTY` (square high threshold, 0x8000 = 50 %),
 +7 `MODPARAM` (AM: depth, 0xFFFF = 100 %; FM: peak deviation at full-scale
 audio in units of 256 FTW steps, i.e. Hz x 2^32 / f_dac / 256 -- 5 kHz at
-108 MS/s is 777), +8 `SKEW` (signed, 2^-16 of a sample: advances the phase of
+112.5 MS/s is 746), +8 `SKEW` (signed, 2^-16 of a sample: advances the phase of
 every odd DAC sample by FTW x SKEW / 65536 to cancel a fixed timing skew between
-the even and odd samples of the 108 MS/s serializer output; calibrate it per
+the even and odd samples of the two-samples-per-clock serializer output; calibrate it per
 board with `acm9767_ctl.py skew` by minimising the f_dac/2 - f spur -- on the
 reference bench it did not help, so leave it at 0 unless a stable null shows
 up; no effect on 54 MS/s builds; `set` leaves it alone). AM puts the unmodulated carrier at half scale so 100 % depth

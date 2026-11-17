@@ -15,7 +15,7 @@
 //         SSB: bb_i*cos(ph) -/+ bb_q*sin(ph)  (USB: minus, LSB: plus)
 //         AM : (1 + depth*bb_i) * cos(ph) / 2   depth = modparam / 65536
 //         FM : phase += ftw + bb_i*modparam*256/32768 per sample (deviation at full-scale
-//              audio = modparam*256 FTW units; NFM 5 kHz at 108 MS/s = modparam 777)
+//              audio = modparam*256 FTW units; NFM 5 kHz at 112.5 MS/s = modparam 746)
 //   scaled = raw * (amplitude + 1) >> 16   (0xFFFF = unity gain)
 //   sum = sat14(scaled + offset)
 //   dac_code = en ? (sum + 8192) ^ {14{invert}} : 0x2000 (mid-scale = 0 V)

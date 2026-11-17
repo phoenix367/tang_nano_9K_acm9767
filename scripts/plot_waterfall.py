@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Waterfall (spectrogram) of a loopback DAC dump around the carrier.
 
-The DAC codes (108 MS/s by default) are converted to the complex baseband around the carrier
+The DAC codes (112.5 MS/s by default) are converted to the complex baseband around the carrier
 (analytic signal x e^-j2*pi*fc*t), decimated, and short-time Fourier
 transformed: positive offsets are the upper sideband, negative the lower one,
 0 Hz the carrier -- so an SSB signal shows its audio content on one side only
@@ -64,7 +64,7 @@ def main():
     # complex baseband around the carrier, decimated to a rate that holds the span
     n = np.arange(len(rf))
     bb = L.analytic(rf) * np.exp(-2j * np.pi * fc * n / L.FS_DAC)
-    dec = int(L.FS_DAC // (4 * args.span))           # e.g. 108e6 / 20e3 -> 5400
+    dec = int(L.FS_DAC // (4 * args.span))           # e.g. 112.5e6 / 20e3 -> 5625
     fs_bb = L.FS_DAC / dec
     bb = L.lowpass(bb, L.FS_DAC, fs_bb / 2 * 0.9)[::dec]
     t_rf, f_rf, S_rf = stft_db(bb, fs_bb, args.win_ms * 1e-3, args.hop_ms * 1e-3, True)

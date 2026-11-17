@@ -21,7 +21,7 @@ README.md; this tool wraps it in physical units:
     acm9767_ctl.py stream --carrier 10.7e6 --mode nfm --deviation 5000 --tone 1000  # NFM, 5 kHz dev
 
 `stream` pushes signed 16-bit audio at the device's audio rate (register 0x0A,
-16 kS/s by default) into the on-chip FIFO with FC16 blocks, pacing on
+15.625 kS/s by default) into the on-chip FIFO with FC16 blocks, pacing on
 FIFO_LEVEL; channel 1 is switched to ssb-usb / ssb-lsb on the given carrier.
 
 `set` stages the channel block and commits unless --no-commit is given, so a
@@ -46,7 +46,7 @@ try:
 
     FALLBACK_DAC_CLK_HZ = _platform.DAC_RATE_HZ      # DAC sample rate (not the gateware dac_clk)
 except Exception:  # pragma: no cover
-    FALLBACK_DAC_CLK_HZ = 108_000_000
+    FALLBACK_DAC_CLK_HZ = 112_500_000
 
 # ---- register map (mirror of src/acm9767_defs.vh) ----
 REG_ID, REG_VERSION, REG_STATUS, REG_CONTROL, REG_COMMIT = 0x00, 0x01, 0x02, 0x03, 0x04
@@ -522,7 +522,8 @@ def build_parser():
 
     sub.add_parser("commit", help="apply the staged registers").set_defaults(fn=cmd_commit)
 
-    p = sub.add_parser("skew", help="show / set the even-odd DAC update skew calibration (108 MS/s builds)")
+    p = sub.add_parser("skew", help="show / set the even-odd DAC update skew calibration "
+                                    "(two-samples-per-clock builds)")
     p.add_argument("channel", type=int, choices=(1, 2))
     g = p.add_mutually_exclusive_group()
     g.add_argument("value", type=int, nargs="?", help="raw register value, 2^-16 sample (signed)")
