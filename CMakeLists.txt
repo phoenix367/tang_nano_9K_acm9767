@@ -121,6 +121,7 @@ platform_json_int("odiv"            PLATFORM_PLL_ODIV)
 # dac
 platform_json_int("bits"            PLATFORM_DAC_BITS)
 platform_json_int("channels"        PLATFORM_DAC_CHANNELS)
+platform_json_int("samples_per_clock" PLATFORM_DAC_PHASES)
 platform_json_int("sine_lut_depth"  PLATFORM_SINE_LUT_DEPTH)
 # modbus
 platform_json_int("device_id"       PLATFORM_MODBUS_DEVICE_ID)
@@ -154,8 +155,24 @@ if (NOT PLATFORM_PLL_ODIV IN_LIST _ODIV_OK)
 endif()
 math(EXPR PLATFORM_PLL_IDIV_SEL  "${PLATFORM_PLL_IDIV} - 1")
 math(EXPR PLATFORM_PLL_FBDIV_SEL "${PLATFORM_PLL_FBDIV} - 1")
-math(EXPR PLATFORM_DAC_CLK_HZ    "${PLATFORM_SYS_CLK_HZ} * ${PLATFORM_PLL_FBDIV} / ${PLATFORM_PLL_IDIV}")
-math(EXPR _PLL_VCO_HZ            "${PLATFORM_DAC_CLK_HZ} * ${PLATFORM_PLL_ODIV}")
+# The rPLL output is the DAC sample rate. dac.samples_per_clock (PHASES) = 2
+# runs the logic at half of it (CLKDIV /2, two samples per clock, OSER4 output
+# stage); 1 runs it at the sample rate (ODDR output stage).
+math(EXPR PLATFORM_DAC_RATE_HZ   "${PLATFORM_SYS_CLK_HZ} * ${PLATFORM_PLL_FBDIV} / ${PLATFORM_PLL_IDIV}")
+math(EXPR _rate_check            "${PLATFORM_DAC_RATE_HZ} * ${PLATFORM_PLL_IDIV}")
+math(EXPR _rate_ref              "${PLATFORM_SYS_CLK_HZ} * ${PLATFORM_PLL_FBDIV}")
+if (NOT _rate_check EQUAL _rate_ref)
+    message(FATAL_ERROR "platform.json: sys_clk_hz * fbdiv / idiv is not an integer number of Hz")
+endif()
+if (NOT (PLATFORM_DAC_PHASES EQUAL 1 OR PLATFORM_DAC_PHASES EQUAL 2))
+    message(FATAL_ERROR "platform.json: dac.samples_per_clock must be 1 or 2")
+endif()
+math(EXPR PLATFORM_DAC_CLK_HZ    "${PLATFORM_DAC_RATE_HZ} / ${PLATFORM_DAC_PHASES}")
+math(EXPR _clk_check             "${PLATFORM_DAC_CLK_HZ} * ${PLATFORM_DAC_PHASES}")
+if (NOT _clk_check EQUAL PLATFORM_DAC_RATE_HZ)
+    message(FATAL_ERROR "platform.json: the DAC rate ${PLATFORM_DAC_RATE_HZ} Hz is not divisible by samples_per_clock")
+endif()
+math(EXPR _PLL_VCO_HZ            "${PLATFORM_DAC_RATE_HZ} * ${PLATFORM_PLL_ODIV}")
 math(EXPR _PLL_PFD_HZ            "${PLATFORM_SYS_CLK_HZ} / ${PLATFORM_PLL_IDIV}")
 # GW1NR-9C rPLL operating window (DS117): VCO 400..1200 MHz, PFD 3..400 MHz.
 if (_PLL_VCO_HZ LESS 400000000 OR _PLL_VCO_HZ GREATER 1200000000)
@@ -164,8 +181,22 @@ endif()
 if (_PLL_PFD_HZ LESS 3000000 OR _PLL_PFD_HZ GREATER 400000000)
     message(WARNING "platform.json: PLL PFD input = ${_PLL_PFD_HZ} Hz is outside 3..400 MHz; adjust pll.idiv")
 endif()
-if (PLATFORM_DAC_CLK_HZ GREATER 125000000)
-    message(WARNING "platform.json: dac_clk = ${PLATFORM_DAC_CLK_HZ} Hz exceeds the AD9767's 125 MSPS maximum")
+if (PLATFORM_DAC_RATE_HZ GREATER 125000000)
+    message(WARNING "platform.json: DAC rate ${PLATFORM_DAC_RATE_HZ} Hz exceeds the AD9767's 125 MSPS maximum")
+endif()
+# SDC clock definitions for the dac domain (net names from acm9767_top).
+if (PLATFORM_DAC_PHASES EQUAL 2)
+    set(PLATFORM_SDC_DAC_CLOCKS
+"// dac_fclk = base * fbdiv / idiv = ${PLATFORM_DAC_RATE_HZ} Hz (rPLL -> OSER4 FCLK only),
+// dac_clk = dac_fclk / 2 = ${PLATFORM_DAC_CLK_HZ} Hz (CLKDIV -> logic + OSER4 PCLK).
+create_generated_clock -name dac_fclk -source [get_ports {sys_clk}] -master_clock base -multiply_by ${PLATFORM_PLL_FBDIV} -divide_by ${PLATFORM_PLL_IDIV} [get_nets {dac_fclk}]
+create_generated_clock -name dac_clk -source [get_nets {dac_fclk}] -master_clock dac_fclk -divide_by 2 [get_nets {dac_clk}]")
+    set(PLATFORM_SDC_DAC_GROUP "[get_clocks {dac_fclk dac_clk}]")
+else()
+    set(PLATFORM_SDC_DAC_CLOCKS
+"// dac_clk = base * fbdiv / idiv = ${PLATFORM_DAC_CLK_HZ} Hz (one sample per clock).
+create_generated_clock -name dac_clk -source [get_ports {sys_clk}] -master_clock base -multiply_by ${PLATFORM_PLL_FBDIV} -divide_by ${PLATFORM_PLL_IDIV} [get_nets {dac_clk}]")
+    set(PLATFORM_SDC_DAC_GROUP "[get_clocks {dac_clk}]")
 endif()
 # Channel count: 1 wires only DA1 (clk/wrt/data), 2 adds the DA2 ports + DDS.
 if (PLATFORM_DAC_CHANNELS EQUAL 1)
@@ -176,8 +207,10 @@ else()
     message(FATAL_ERROR "platform.json: dac.channels must be 1 or 2")
 endif()
 # ---- SSB baseband chain constants ----
-# Interpolation ratio baseband -> dac_clk must be an integer (the tick counter
-# and the CIC comb delay are exact); the CIC is fixed at 3 stages, DC gain R^2.
+# Interpolation ratio baseband -> dac_clk (the logic clock, not the sample rate:
+# with two samples per clock the CIC output is shared by both) must be an
+# integer (the tick counter and the CIC comb delay are exact); the CIC is fixed
+# at 3 stages, DC gain R^2.
 math(EXPR PLATFORM_SSB_INTERP "${PLATFORM_DAC_CLK_HZ} / ${PLATFORM_SSB_AUDIO_RATE_HZ}")
 math(EXPR _ssb_check "${PLATFORM_SSB_INTERP} * ${PLATFORM_SSB_AUDIO_RATE_HZ}")
 if (NOT _ssb_check EQUAL PLATFORM_DAC_CLK_HZ)
@@ -242,7 +275,8 @@ while (_fl LESS 3)
 endwhile()
 set(PLATFORM_SYS_CLK_HALF_NS "${_SYS_HALF_INT}.${_SYS_HALF_FRAC}")
 
-message(STATUS "Platform: sys_clk ${PLATFORM_SYS_CLK_HZ} Hz, dac_clk ${PLATFORM_DAC_CLK_HZ} Hz "
+message(STATUS "Platform: sys_clk ${PLATFORM_SYS_CLK_HZ} Hz, DAC ${PLATFORM_DAC_RATE_HZ} S/s = "
+               "${PLATFORM_DAC_PHASES} x dac_clk ${PLATFORM_DAC_CLK_HZ} Hz "
                "(rPLL x${PLATFORM_PLL_FBDIV}/${PLATFORM_PLL_IDIV}, VCO ${_PLL_VCO_HZ} Hz)")
 message(STATUS "Platform: Modbus id ${PLATFORM_MODBUS_DEVICE_ID} (addr_limit=${PLATFORM_MODBUS_ADDR_LIMIT}, "
                "max_read_qty=${PLATFORM_MODBUS_MAX_READ_QTY}), UART ${PLATFORM_UART_BAUD} "

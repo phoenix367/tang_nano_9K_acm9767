@@ -11,7 +11,7 @@ What changed against the FPGA design to fit an ASIC with no RAM, PLL or DSP:
 
 | FPGA | ASIC |
 | --- | --- |
-| 27 MHz crystal + PLL → 54 MHz | the Tiny Tapeout clock is the sample clock (50 MHz) |
+| 27 MHz crystal + PLL → 108 MS/s (54 MHz logic, two samples per clock, OSER4 serializers) | the Tiny Tapeout clock is the sample clock (50 MHz) |
 | 4096-point quarter-wave sine ROM in block RAM | 64-entry midpoint table + linear interpolation (±1 LSB), sine and cosine |
 | SSB: 127-tap Hilbert FIR, CIC, 2048-sample FIFO | phasing method with two 3-section IIR all-pass chains on the serial multiplier, two 3-stage CICs, I/Q mixer (`SSB` parameter) |
 | AM / FM with two parallel multipliers | one shared serial multiplier for everything that changes per audio sample |

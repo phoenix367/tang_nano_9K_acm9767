@@ -7,14 +7,14 @@
 // 27 MHz crystal on pin 52.
 create_clock -name base -period @PLATFORM_SYS_CLK_PERIOD_NS@ -waveform {0 @PLATFORM_SYS_CLK_HALF_NS@} [get_ports {sys_clk}]
 
-// DAC sample clock out of the rPLL (net dac_clk in acm9767_top):
-// dac_clk = base * fbdiv / idiv = @PLATFORM_DAC_CLK_HZ@ Hz.
-create_generated_clock -name dac_clk -source [get_ports {sys_clk}] -master_clock base -multiply_by @PLATFORM_PLL_FBDIV@ -divide_by @PLATFORM_PLL_IDIV@ [get_nets {dac_clk}]
+// DAC clocks out of the rPLL (nets in acm9767_top; dac.samples_per_clock
+// selects the variant):
+@PLATFORM_SDC_DAC_CLOCKS@
 
-// The only base <-> dac_clk crossings are the toggle-handshake synchronisers in
+// The only base <-> dac crossings are the toggle-handshake synchronisers in
 // cdc_commit_sync / reset_sync (2-FF chains), so the domains are asynchronous
 // for STA purposes.
-set_clock_groups -asynchronous -group [get_clocks {base}] -group [get_clocks {dac_clk}]
+set_clock_groups -asynchronous -group [get_clocks {base}] -group @PLATFORM_SDC_DAC_GROUP@
 
 report_high_fanout_nets -max_nets 10
 // Per-clock worst paths in the timing report (the default listing is global

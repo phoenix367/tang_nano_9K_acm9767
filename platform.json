@@ -4,12 +4,13 @@
   },
   "pll": {
     "idiv": 1,
-    "fbdiv": 2,
-    "odiv": 16
+    "fbdiv": 4,
+    "odiv": 8
   },
   "dac": {
     "bits": 14,
     "channels": 1,
+    "samples_per_clock": 2,
     "sine_lut_depth": 4096
   },
   "modbus": {

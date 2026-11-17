@@ -22,7 +22,7 @@ localparam real    PI    = 3.14159265358979;
 reg clk = 0, rst_n = 0;
 reg [3:0]  waveform = `WAVE_SINE;
 wire [13:0] dac_code;
-dds_channel dut (
+dds_channel #(.PHASES(1)) dut (
     .clk(clk), .rst_n(rst_n), .en(1'b1), .invert(1'b0),
     .ftw(FTW), .phase_ofs(16'd0), .amplitude(16'hFFFF), .offset(16'd0),
     .waveform(waveform), .duty(16'h8000), .modparam(16'd0),

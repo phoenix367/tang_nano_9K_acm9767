@@ -203,7 +203,7 @@ initial begin
     // off mid-scale for some samples.
     active = 0;
     for (i = 0; i < 2000; i = i + 1) begin
-        @(posedge dut.dac_clk); #2;
+        @(posedge da1_wrt);                      // one DAC sample (the AD9767's latch edge)
         if (da1_data !== 14'h2000) active = active + 1;
     end
     if (dut.baseband.lim.gain == 0 || dut.baseband.lim.gain == 17'd32768) begin

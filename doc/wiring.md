@@ -51,10 +51,11 @@ and WRT1 run down the left header in physical order.
 
 `da1_wrt` is the AD9767's WRT1 input-latch strobe. The gateware drives WRT1
 as the inverted sample clock (data is centred on its rising edge) and CLK1 as
-the non-inverted clock, so CLK1 rises 9.3 ns *before* WRT1. That keeps the
-pair clear of the datasheet's forbidden window (CLK must not rise 0..2 ns
-after WRT) regardless of lead-length or driver skew; the DAC latch then takes
-the previous input-latch word, one sample of extra latency. If the module ties
+the non-inverted clock, so CLK1 rises half a sample *before* WRT1 (4.6 ns at
+the default 108 MS/s, 9.3 ns at 54 MS/s). That keeps the pair clear of the
+datasheet's forbidden window (CLK must not rise 0..2 ns after WRT) regardless
+of lead-length or driver skew; the DAC latch then takes the previous
+input-latch word, one sample of extra latency. If the module ties
 WRT1 to CLK1 internally, connect only WRT1 (data timing is relative to WRT). Power the module from its own 5 V input (the Tang
 Nano 9K's 5 V pin can supply it if your USB port has the headroom: the AD9767
 alone draws ~130 mA at 3.3 V plus the op-amps).
@@ -74,22 +75,38 @@ any other 3.3 V pins), and rebuild. Free 3.3 V pins on the 1-channel build:
 * **Polarity**: which rail is +5 V depends on the module's op-amp wiring.
   If a sawtooth ramps the wrong way on the scope, set the channel's invert
   bit (`acm9767_ctl.py invert 1 --on`) -- no rebuild needed.
-* **Clocking**: data changes on the rising edge of the internal `dac_clk`;
-  `da*_wrt` is the *inverted* clock (ODDR, `WRT_INVERT=1` in
-  `dac_output_stage.sv`), so the input-latch edge lands mid-way between data
-  transitions: ~9 ns setup and hold at 54 MHz against the AD9767's 2.0 / 1.5 ns
-  minimums; `da*_clk` is the non-inverted clock (`CLK_INVERT=0`), half a
-  period ahead of WRT.
-* **Lead lengths**: the timing budget tolerates about ±5 ns (±1 m) of
-  clock-vs-data mismatch at 54 MHz, so matching is not a concern. Signal
-  integrity is: keep every lead under ~15 cm (unterminated 8 mA CMOS edges
-  ring beyond that), of similar length, with ground returns next to WRT/CLK
-  and every few data lines; 20-40 cm needs 33 Ohm series resistors at the
-  FPGA end. Above ~60 MHz use a proper adapter board.
-* **Sample rate**: `platform.json` `pll.fbdiv`/`pll.idiv` set
-  `dac_clk = 27 MHz * fbdiv / idiv` (default 54 MHz). The bitstream reports
-  the value in registers 0x05/0x06 so the host CLI computes tuning words
-  against the real rate.
+* **Clocking**: every DAC pin (data, CLK, WRT) is driven by an OSER4
+  serializer clocked at the sample rate (108 MHz, DDR), fed two samples per
+  54 MHz logic clock; each data bit is sent for two half-periods, CLK as `1,0`
+  and WRT as `0,1` per sample (`dac_output_stage.sv`). So the data changes
+  with CLK's rising edge and WRT rises mid-way between data transitions:
+  4.6 ns of nominal setup and hold at 108 MS/s against the AD9767's 2.0 / 1.5
+  ns minimums, i.e. ~2.6 ns / ~3.1 ns of margin for driver skew, edge time
+  and lead mismatch together. `dac.samples_per_clock = 1` (with `pll.fbdiv` 2,
+  `pll.odiv` 16) restores the 54 MS/s ODDR build: one sample per clock, 9.3 ns
+  either side.
+* **Lead lengths**: at 54 MS/s the budget tolerated about ±5 ns (±1 m) of
+  clock-vs-data mismatch; at 108 MS/s it is about ±2.5 ns *before* edge
+  times, and WRT/CLK are 108 MHz square waves with only 4.6 ns between edges,
+  so ringing on an unterminated jumper can double-clock the DAC. The FPGA
+  has no on-chip series resistor (`SINGLE_RESISTOR` / `DIFF_RESISTOR` are the
+  100 Ohm *input* termination of banks 1/3, and the GW1NR-9 flow ignores
+  `SLEW_RATE`), but the LVCMOS33 driver impedance follows the drive strength
+  (Gowin IBIS: ~48 Ohm at 4 mA, ~24 at 8 mA), so every DAC pin is set to
+  `DRIVE=4` in `src/acm9767.cst`: roughly the source impedance of 8 mA plus an
+  external 33 Ohm, with 150 MHz still guaranteed into 30 pF (DS100 Table
+  4-18). Keep every lead under ~10 cm and of similar length, and run ground
+  returns next to WRT/CLK and every few data lines; with longer wiring add
+  external 22-33 Ohm series resistors at the FPGA end of CLK and WRT on top.
+  If the output shows sparkle codes or a garbled spectrum at 108 MS/s that the
+  54 MS/s build does not, the wiring is the first suspect -- try `DRIVE=8`
+  (if the edges are too slow), go back to `samples_per_clock = 1`, or build a
+  proper adapter board.
+* **Sample rate**: `platform.json` `pll.fbdiv`/`pll.idiv` set the DAC sample
+  rate `f_dac = 27 MHz * fbdiv / idiv` (default 108 MS/s = 27 x 4, PFD
+  27 MHz, VCO 864 MHz); the logic clock `dac_clk` is f_dac /
+  `dac.samples_per_clock`. The bitstream reports f_dac in registers 0x05/0x06
+  so the host CLI computes tuning words against the real rate.
 
 ## Board resources used by the gateware
 

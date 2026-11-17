@@ -32,7 +32,7 @@ wire [13:0] dac_code;
 string module_name;
 DataLogger #(.verbosity(LOG_LEVEL)) logger();
 
-dds_channel dut (
+dds_channel #(.PHASES(1)) dut (
     .clk(clk), .rst_n(rst_n), .en(en), .invert(invert),
     .ftw(ftw), .phase_ofs(phase_ofs), .amplitude(amplitude), .offset(offset),
     .waveform(waveform), .duty(duty), .modparam(modparam), .bb_i(bb_i), .bb_q(16'sd0), .dac_code(dac_code)

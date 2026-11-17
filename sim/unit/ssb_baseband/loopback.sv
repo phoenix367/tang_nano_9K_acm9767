@@ -13,7 +13,8 @@
 //
 // Plusargs: +in=<file>   int16 big-endian audio samples
 //           +n=<count>   number of samples in the file
-//           +out=<file>  uint16 big-endian DAC codes, one per dac_clk
+//           +out=<file>  uint16 big-endian DAC codes, one per DAC sample
+//                        (PHASES per dac_clk, lane 0 first)
 //           +ftw=<int>   carrier tuning word
 //           +wave=<int>  WAVE_* code (5 usb, 6 lsb, 7 am, 8 fm)
 //           +modparam=<int>  AM depth / FM deviation register (default 0)
@@ -22,6 +23,9 @@ module main();
 
 localparam LOG_LEVEL = `DEFAULT_LOG_LEVEL;
 localparam integer INTERP = `PLATFORM_SSB_INTERP;
+// samples per clk; override with iverilog -Pmain.PHASES=1 to dump the
+// one-sample-per-clock datapath (same baseband, same clk)
+parameter  integer PHASES = `PLATFORM_DAC_PHASES;
 localparam integer TAIL   = 140;                     // samples of flush after the input
 
 reg clk = 0, rst_n = 0;
@@ -54,8 +58,8 @@ ssb_baseband dut (
 reg [3:0]  waveform = `WAVE_SSB_USB;
 reg [31:0] ftw = 32'h0800_0000;
 reg [15:0] modparam = 16'd0;
-wire [13:0] dac_code;
-dds_channel chan (
+wire [14*PHASES-1:0] dac_code;
+dds_channel #(.PHASES(PHASES)) chan (
     .clk(clk), .rst_n(rst_n), .en(1'b1), .invert(1'b0),
     .ftw(ftw), .phase_ofs(16'd0), .amplitude(16'hFFFF), .offset(16'd0),
     .waveform(waveform), .duty(16'h8000), .modparam(modparam),
@@ -65,7 +69,7 @@ dds_channel chan (
 string module_name;
 DataLogger #(.verbosity(LOG_LEVEL)) logger();
 string str;
-integer cycles, total;
+integer cycles, total, k;
 
 initial begin
     $sformat(module_name, "%m");
@@ -95,10 +99,11 @@ initial begin
     total = (n_in + TAIL) * INTERP;
     for (cycles = 0; cycles < total; cycles = cycles + 1) begin
         @(posedge clk); #2;
-        $fwrite(fd_out, "%c%c", {2'b00, dac_code[13:8]}, dac_code[7:0]);
+        for (k = 0; k < PHASES; k = k + 1)
+            $fwrite(fd_out, "%c%c", {2'b00, dac_code[14*k+8 +: 6]}, dac_code[14*k +: 8]);
     end
     $fclose(fd_out);
-    $sformat(str, "wrote %0d DAC codes to %s", total, out_path);
+    $sformat(str, "wrote %0d DAC codes to %s", total * PHASES, out_path);
     logger.info(module_name, str);
     `TEST_PASS
 end

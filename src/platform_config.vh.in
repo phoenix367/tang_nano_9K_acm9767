@@ -17,6 +17,8 @@
 `define PLATFORM_PLL_IDIV_SEL       @PLATFORM_PLL_IDIV_SEL@
 `define PLATFORM_PLL_FBDIV_SEL      @PLATFORM_PLL_FBDIV_SEL@
 `define PLATFORM_PLL_ODIV_SEL       @PLATFORM_PLL_ODIV@
+// DAC sample rate (rPLL output) and the dac_clk logic clock = rate / PHASES
+`define PLATFORM_DAC_RATE_HZ        @PLATFORM_DAC_RATE_HZ@
 `define PLATFORM_DAC_CLK_HZ         @PLATFORM_DAC_CLK_HZ@
 // rPLL FCLKIN parameter is a string holding the input clock in MHz.
 `define PLATFORM_PLL_FCLKIN_MHZ     "@PLATFORM_PLL_FCLKIN_MHZ@"
@@ -24,6 +26,9 @@
 // ---- dac ----
 `define PLATFORM_DAC_BITS           @PLATFORM_DAC_BITS@
 `define PLATFORM_DAC_CHANNELS       @PLATFORM_DAC_CHANNELS@
+// samples per dac_clk (dac.samples_per_clock): 1 = ODDR output stage,
+// 2 = OSER4 output stage at twice the dac_clk rate
+`define PLATFORM_DAC_PHASES         @PLATFORM_DAC_PHASES@
 // Defined only when dac.channels == 2: brings out the DA2 ports and the 2nd DDS.
 @PLATFORM_DAC_CH2_DEFINE@
 `define PLATFORM_SINE_LUT_DEPTH     @PLATFORM_SINE_LUT_DEPTH@

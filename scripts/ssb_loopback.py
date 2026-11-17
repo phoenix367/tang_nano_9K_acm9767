@@ -36,15 +36,16 @@ WAVE_CODE = {"usb": 5, "lsb": 6, "am": 7, "fm": 8}
 # Platform constants; the Tiny Tapeout build overrides them with --fs-dac /
 # --audio-rate / --max-delay (its clock is 50 MHz and its Hilbert network is
 # a short IIR, not a 127-tap FIR).
-FS_DAC = pc.DAC_CLK_HZ
+FS_DAC = pc.DAC_RATE_HZ               # DAC sample rate (the dump has one code per sample)
 FS_AUDIO = pc.SSB_AUDIO_RATE_HZ
-INTERP = pc.SSB_INTERP
+INTERP = FS_DAC // FS_AUDIO            # DAC samples per audio sample (the gateware CIC ratio is
+                                       # INTERP / samples_per_clock; the other lane repeats its output)
 TAPS = pc.SSB_HILBERT_TAPS          # also the alignment search window, in audio samples
 DC_SHIFT = getattr(pc, "SSB_DC_BLOCK_SHIFT", 0)   # the modulator's DC blocker leak, 2^-shift
 TONES = [(400.0, 0.25), (1000.0, 0.35), (1700.0, 0.20), (2600.0, 0.20)]   # Hz, fraction of level
 PAD = 256          # silence samples before/after the audio so the FIR/CIC start and end in a defined state
 AUDIO_BW = 5000.0
-DEFAULT_CARRIER = FS_DAC / 32          # 1.6875 MHz at 54 MHz
+DEFAULT_CARRIER = FS_DAC / 32          # 3.375 MHz at 108 MS/s
 DEFAULT_DEVIATION = 5000.0
 DEFAULT_DEPTH = 0.8
 

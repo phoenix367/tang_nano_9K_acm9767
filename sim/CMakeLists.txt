@@ -31,6 +31,7 @@ set(UNIT_TESTS
     dac_regs/regmap
     dds_channel/waveforms
     dds_channel/sine_table
+    dds_channel/phases
     dac_output_stage/clock_forward
     async_fifo/basic
     hilbert_fir/response

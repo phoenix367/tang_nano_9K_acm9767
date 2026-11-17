@@ -6,14 +6,16 @@
 `include "test_config.sv"
 
 // End-to-end test of acm9767_top with the real platform.json parameters:
-// 27 MHz sys_clk, the rPLL simulation model making dac_clk, 1 Mbaud 8-E-1
+// 27 MHz sys_clk, the rPLL simulation model making the DAC clocks, 1 Mbaud 8-E-1
 // Modbus RTU from a testbench "host" UART.
 //
 // Flow: wait for the PLL to lock (polled through STATUS over Modbus), read the
 // identity / clock registers, program channel 1 with FC10 (32 samples per
 // period sine), enable it in CONTROL, write COMMIT, wait for STATUS.busy to
-// clear, then watch da1_data in the dac_clk domain: 10 periods must contain
-// 10 (+-1) rising mid-scale crossings, da1_clk / da1_wrt must toggle in antiphase. On a
+// clear, then watch da1_data as the DAC latches it (on the da1_wrt rising
+// edges, so one sample per DAC clock whatever dac.samples_per_clock is): 10
+// periods must contain 10 (+-1) rising mid-scale crossings, da1_clk / da1_wrt
+// must toggle in antiphase, two edges per sample. On a
 // two-channel build (PLATFORM_DAC_CH2) channel 2 must sit at mid-scale and then
 // gets a square wave and must toggle too.
 
@@ -185,15 +187,23 @@ always @(da1_clk) clk_edges[0] = clk_edges[0] + 1;
 always @(da1_wrt) wrt_edges = wrt_edges + 1;
 always @(da2_clk) clk_edges[1] = clk_edges[1] + 1;
 
-// count rising mid-scale crossings on a data bus over n dac_clk cycles, and the
-// DAC clock edges seen meanwhile (expect 2 per cycle)
+// one DAC sample: wait for the channel's WRT rising edge (the AD9767's input
+// latch; the data is mid-way between its transitions there)
+task automatic next_sample(input integer ch);
+    begin
+        if (ch) @(posedge da2_wrt); else @(posedge da1_wrt);
+    end
+endtask
+
+// count rising mid-scale crossings on a data bus over n DAC samples, and the
+// DAC clock edges seen meanwhile (expect 2 per sample)
 task automatic count_crossings(input integer ch, input integer n, output integer cnt, output integer toggles);
     integer i, e0; reg [13:0] prev, cur;
     begin
         cnt = 0;
-        @(posedge dut.dac_clk); #2; prev = ch ? da2_data : da1_data; e0 = clk_edges[ch];
+        next_sample(ch); prev = ch ? da2_data : da1_data; e0 = clk_edges[ch];
         for (i = 0; i < n; i = i + 1) begin
-            @(posedge dut.dac_clk); #2;
+            next_sample(ch);
             cur = ch ? da2_data : da1_data;
             if (prev < 14'h2000 && cur >= 14'h2000) cnt = cnt + 1;
             prev = cur;
@@ -202,7 +212,7 @@ task automatic count_crossings(input integer ch, input integer n, output integer
     end
 endtask
 
-localparam [31:0] DAC_CLK = `PLATFORM_DAC_CLK_HZ;
+localparam [31:0] DAC_CLK = `PLATFORM_DAC_RATE_HZ;   // registers report the sample rate
 integer cnt, tog, i;
 reg [13:0] v14;
 reg still;
@@ -230,7 +240,7 @@ initial begin
     // before any commit both DACs sit at mid-scale and the DAC clocks run
     count_crossings(0, 64, cnt, tog);
     if (cnt != 0 || da1_data !== 14'h2000 || da2_data !== 14'h2000) begin logger.error(module_name, "DAC not at mid-scale before commit"); errors++; end
-    if (tog < 126 || tog > 130) begin $sformat(str, "da1_clk toggled %0d times in 64 cycles, expected 128", tog); logger.error(module_name, str); errors++; end
+    if (tog < 126 || tog > 130) begin $sformat(str, "da1_clk toggled %0d times in 64 samples, expected 128", tog); logger.error(module_name, str); errors++; end
     else logger.info(module_name, "da1_clk forwarded clock running");
     if (wrt_edges < 126) begin $sformat(str, "da1_wrt toggled only %0d times", wrt_edges); logger.error(module_name, str); errors++; end
     if (da1_wrt !== ~da1_clk) begin logger.error(module_name, "da1_wrt is not the inverse of da1_clk (CLK must lead WRT by half a period)"); errors++; end
@@ -250,7 +260,7 @@ initial begin
 `ifdef PLATFORM_DAC_CH2
     count_crossings(1, 64, cnt, tog);
     if (cnt != 0 || da2_data !== 14'h2000) begin logger.error(module_name, "ch2 not idle at mid-scale"); errors++; end
-    if (tog < 126 || tog > 130) begin $sformat(str, "da2_clk toggled %0d times in 64 cycles, expected 128", tog); logger.error(module_name, str); errors++; end
+    if (tog < 126 || tog > 130) begin $sformat(str, "da2_clk toggled %0d times in 64 samples, expected 128", tog); logger.error(module_name, str); errors++; end
 
     // channel 2: square 50 %, 4 samples/period; commit; must toggle between the two rails
     write_channel(CH2, 32'h4000_0000, 16'h0000, 16'hFFFF, 16'h0000, {12'd0, `WAVE_SQUARE}, 16'h8000);
@@ -258,11 +268,11 @@ initial begin
     write_reg(`REG_COMMIT, 16'h0001);
     wait_status(16'h0002, 16'h0000, "second commit applied");
     count_crossings(1, 40, cnt, tog);
-    if (cnt != 10) begin $sformat(str, "ch2 square: %0d rising crossings in 40 cycles, expected 10", cnt); logger.error(module_name, str); errors++; end
+    if (cnt != 10) begin $sformat(str, "ch2 square: %0d rising crossings in 40 samples, expected 10", cnt); logger.error(module_name, str); errors++; end
     else logger.info(module_name, "ch2 square OK");
     still = 1;
     for (i = 0; i < 8; i = i + 1) begin
-        @(posedge dut.dac_clk); #2;
+        next_sample(1);
         if (da2_data !== 14'h3FFF && da2_data !== 14'h0000) still = 0;
     end
     if (!still) begin logger.error(module_name, "ch2 square not on the rails"); errors++; end

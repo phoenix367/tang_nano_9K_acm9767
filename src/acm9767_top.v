@@ -10,6 +10,10 @@
 //   sys_clk (27 MHz crystal)  UART + Modbus RTU slave + register file (dac_regs)
 //   dac_clk (rPLL, platform.json pll.*)  DDS channel(s), SSB baseband chain,
 //                                        DAC output stage
+// The rPLL makes the DAC sample clock f_dac. With dac.samples_per_clock = 2
+// (PLATFORM_DAC_PHASES) that is dac_fclk, which only clocks the OSER4
+// serializers, and dac_clk = dac_fclk / 2 (CLKDIV) runs the logic, two samples
+// per clock; with 1, dac_clk = f_dac and the output stage uses ODDRs.
 // Crossings: the committed register snapshot (cdc_commit_sync), the audio
 // sample FIFO (async_fifo), the underrun toggle and the PLL lock status.
 //
@@ -37,8 +41,19 @@ module acm9767_top (
 wire sys_rst_n_s;
 reset_sync sys_reset_sync (.clk(sys_clk), .async_rst_n(sys_rst_n), .rst_n(sys_rst_n_s));
 
-wire dac_clk, pll_lock;
-dac_pll pll (.clkin(sys_clk), .reset(~sys_rst_n), .clkout(dac_clk), .lock(pll_lock));
+localparam integer PHASES = `PLATFORM_DAC_PHASES;
+wire dac_clk, dac_fclk, pll_lock;
+generate if (PHASES == 2) begin : g_clk2
+    dac_pll pll (.clkin(sys_clk), .reset(~sys_rst_n), .clkout(dac_fclk), .lock(pll_lock));
+    // same-phase /2 for the logic and the OSER4 PCLK (CALIB unused: tied high,
+    // which never triggers the phase-slip function)
+    CLKDIV #(.DIV_MODE("2"), .GSREN("false")) dac_clkdiv (
+        .HCLKIN(dac_fclk), .RESETN(sys_rst_n & pll_lock), .CALIB(1'b1), .CLKOUT(dac_clk)
+    );
+end else begin : g_clk1
+    dac_pll pll (.clkin(sys_clk), .reset(~sys_rst_n), .clkout(dac_clk), .lock(pll_lock));
+    assign dac_fclk = 1'b0;
+end endgenerate
 
 wire dac_rst_n;
 reset_sync dac_reset_sync (.clk(dac_clk), .async_rst_n(sys_rst_n & pll_lock), .rst_n(dac_rst_n));
@@ -139,9 +154,9 @@ cdc_commit_sync #(.WORD_WIDTH(`COMMIT_WORD_W)) commit_cdc (
 // its registers are still writable on a 1-channel build but drive nothing.
 wire [`CTRL_WORD_W-1:0] ctrl = dds_word[`COMMIT_WORD_W-1 -: `CTRL_WORD_W];
 wire [`CH_WORD_W-1:0]   ch1  = dds_word[`CH_WORD_W-1:0];
-wire [13:0] code1;
+wire [14*PHASES-1:0] code1;
 
-dds_channel dds1 (
+dds_channel #(.PHASES(PHASES)) dds1 (
     .clk(dac_clk), .rst_n(dac_rst_n),
     .en(ctrl[`CTRL_CH1_EN]), .invert(ctrl[`CTRL_CH1_INVERT]),
     .ftw(`CH_FTW(ch1)), .phase_ofs(`CH_PHASE(ch1)), .amplitude(`CH_AMPLITUDE(ch1)),
@@ -149,15 +164,15 @@ dds_channel dds1 (
     .modparam(`CH_MODPARAM(ch1)), .bb_i(bb_i), .bb_q(bb_q),
     .dac_code(code1)
 );
-dac_output_stage out1 (
-    .clk(dac_clk), .rst_n(dac_rst_n), .code(code1),
+dac_output_stage #(.PHASES(PHASES)) out1 (
+    .clk(dac_clk), .fclk(dac_fclk), .rst_n(dac_rst_n), .code(code1),
     .da_clk(da1_clk), .da_wrt(da1_wrt), .da_data(da1_data)
 );
 
 `ifdef PLATFORM_DAC_CH2
 wire [`CH_WORD_W-1:0] ch2 = dds_word[2*`CH_WORD_W-1:`CH_WORD_W];
-wire [13:0] code2;
-dds_channel dds2 (
+wire [14*PHASES-1:0] code2;
+dds_channel #(.PHASES(PHASES)) dds2 (
     .clk(dac_clk), .rst_n(dac_rst_n),
     .en(ctrl[`CTRL_CH2_EN]), .invert(ctrl[`CTRL_CH2_INVERT]),
     .ftw(`CH_FTW(ch2)), .phase_ofs(`CH_PHASE(ch2)), .amplitude(`CH_AMPLITUDE(ch2)),
@@ -165,8 +180,8 @@ dds_channel dds2 (
     .modparam(`CH_MODPARAM(ch2)), .bb_i(bb_i), .bb_q(bb_q),
     .dac_code(code2)
 );
-dac_output_stage out2 (
-    .clk(dac_clk), .rst_n(dac_rst_n), .code(code2),
+dac_output_stage #(.PHASES(PHASES)) out2 (
+    .clk(dac_clk), .fclk(dac_fclk), .rst_n(dac_rst_n), .code(code2),
     .da_clk(da2_clk), .da_wrt(da2_wrt), .da_data(da2_data)
 );
 wire ch2_enabled = ctrl_committed[`CTRL_CH2_EN];

@@ -2,8 +2,8 @@
 """Time-domain view of a loopback DAC dump (see scripts/ssb_loopback.py).
 
 Panels: the whole run (DAC codes with the modulation envelope and the input
-audio), a zoom on the envelope beating, and a zoom down to individual 54 MS/s
-samples on the carrier.
+audio), a zoom on the envelope beating, and a zoom down to individual DAC samples
+(108 MS/s by default) on the carrier.
 
     scripts/plot_dac_samples.py --workdir build/loopback/7mhz_usb_4k --carrier 7e6 -o doc/images/x.png
 """
@@ -77,7 +77,7 @@ def main():
     j1 = i0 + int(1.0e-6 * L.FS_DAC)
     tt = (t[i0:j1] - t[i0]) * 1e3
     axs[2].step(tt, codes[i0:j1], where="post", lw=0.8, color="tab:blue",
-                label="DAC holds each code for 1/54 MHz")
+                label=f"DAC holds each code for 1/{L.FS_DAC / 1e6:.0f} MHz")
     axs[2].plot(tt, codes[i0:j1], "o", ms=4, color="tab:blue")
     tf = np.linspace(0, tt[-1], 2000)
     ph = np.interp(tf, tt, np.unwrap(np.angle(L.analytic(codes[i0:j1] - 8192))))

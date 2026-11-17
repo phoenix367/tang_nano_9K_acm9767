@@ -19,15 +19,20 @@ _pll = _CFG["pll"]
 PLL_IDIV = _pll["idiv"]
 PLL_FBDIV = _pll["fbdiv"]
 PLL_ODIV = _pll["odiv"]
-# Gowin rPLL: CLKOUT = CLKIN * FBDIV / IDIV (ODIV only sets the VCO rate).
-DAC_CLK_HZ = SYS_CLK_HZ * PLL_FBDIV // PLL_IDIV
-PLL_VCO_HZ = DAC_CLK_HZ * PLL_ODIV
+# Gowin rPLL: CLKOUT = CLKIN * FBDIV / IDIV (ODIV only sets the VCO rate). The
+# PLL output is the DAC sample rate -- the reference for FTW / FM deviation.
+DAC_RATE_HZ = SYS_CLK_HZ * PLL_FBDIV // PLL_IDIV
+PLL_VCO_HZ = DAC_RATE_HZ * PLL_ODIV
 
 # --- dac ---
 _dac = _CFG["dac"]
 DAC_BITS = _dac["bits"]
 DAC_CHANNELS = _dac["channels"]
 SINE_LUT_DEPTH = _dac["sine_lut_depth"]
+# Samples per gateware dac_clk (1 = ODDR, 2 = OSER4 output stage); dac_clk is
+# the logic clock of the DAC domain, NOT the sample rate.
+DAC_PHASES = _dac.get("samples_per_clock", 1)
+DAC_CLK_HZ = DAC_RATE_HZ // DAC_PHASES
 DAC_FULL_SCALE = (1 << (DAC_BITS - 1)) - 1   # +8191 for 14 bits
 
 # --- modbus ---
@@ -56,5 +61,7 @@ SSB_DC_BLOCK_SHIFT = _ssb["dc_block_shift"]        # HP corner = audio_rate / (2
 SSB_LIMITER_LOOKAHEAD = _ssb["limiter_lookahead"]
 SSB_LIMITER_THRESHOLD = _ssb["limiter_threshold"]  # Q15 envelope
 SSB_LIMITER_RELEASE = _ssb["limiter_release"]
-# Interpolation ratio baseband -> DAC rate; must be an integer (CMake checks too).
+# Interpolation ratio baseband -> dac_clk (the gateware's CIC ratio and tick
+# period); must be an integer (CMake checks too). Per audio sample the DAC
+# outputs SSB_INTERP * DAC_PHASES samples.
 SSB_INTERP = DAC_CLK_HZ // SSB_AUDIO_RATE_HZ

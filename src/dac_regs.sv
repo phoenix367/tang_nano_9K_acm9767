@@ -52,7 +52,7 @@ module dac_regs (
     output wire [`CTRL_WORD_W-1:0]   ctrl_committed
 );
 
-localparam [31:0] DAC_CLK_HZ = `PLATFORM_DAC_CLK_HZ;
+localparam [31:0] DAC_CLK_HZ = `PLATFORM_DAC_RATE_HZ;   // DAC sample rate (registers 0x05/0x06)
 
 // ---- staged registers ----
 reg [`CTRL_WORD_W-1:0] ctrl;

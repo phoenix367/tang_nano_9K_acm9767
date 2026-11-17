@@ -5,7 +5,7 @@ Talks to the FPGA over /dev/ttyGowin (1 Mbaud 8-E-1, slave id 7 by default --
 all from platform.json). The register map lives in src/acm9767_defs.vh and
 README.md; this tool wraps it in physical units:
 
-    acm9767_ctl.py status                      # id, version, PLL lock, dac_clk, channels
+    acm9767_ctl.py status                      # id, version, PLL lock, DAC sample rate, channels
     acm9767_ctl.py set 1 --freq 1e6 --wave sine --amp 1.0
     acm9767_ctl.py set 2 --freq 250e3 --wave square --duty 0.25 --offset 0.1
     acm9767_ctl.py enable 1 2                  # enable channels and commit
@@ -44,9 +44,9 @@ from modbus_rtu import DEFAULT_BAUD, DEFAULT_PORT, DEFAULT_SLAVE, ModbusError, M
 try:
     import platform_config as _platform
 
-    FALLBACK_DAC_CLK_HZ = _platform.DAC_CLK_HZ
+    FALLBACK_DAC_CLK_HZ = _platform.DAC_RATE_HZ      # DAC sample rate (not the gateware dac_clk)
 except Exception:  # pragma: no cover
-    FALLBACK_DAC_CLK_HZ = 54_000_000
+    FALLBACK_DAC_CLK_HZ = 108_000_000
 
 # ---- register map (mirror of src/acm9767_defs.vh) ----
 REG_ID, REG_VERSION, REG_STATUS, REG_CONTROL, REG_COMMIT = 0x00, 0x01, 0x02, 0x03, 0x04
@@ -327,7 +327,7 @@ def cmd_status(dev: Acm9767, args):
     st = dev.status()
     ctrl = dev.control()
     print(f"device   0x{ident:04X}  version {ver >> 8}.{ver & 0xFF}")
-    print(f"dac_clk  {dev.dac_clk_hz} Hz   channels {dev.channels}")
+    print(f"DAC rate {dev.dac_clk_hz} S/s   channels {dev.channels}")
     print(f"status   pll_lock={int(bool(st & STAT_PLL_LOCK))} commit_busy={int(bool(st & STAT_COMMIT_BUSY))}")
     print(f"audio    {dev.audio_rate} S/s, fifo {dev.fifo_level()}/{dev.fifo_depth}, "
           f"underruns {dev.underruns()}")

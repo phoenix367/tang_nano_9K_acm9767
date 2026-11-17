@@ -89,7 +89,7 @@ task automatic expect_reg(input string label, input [15:0] addr, input [15:0] ex
     end
 endtask
 
-localparam [31:0] DAC_CLK = `PLATFORM_DAC_CLK_HZ;
+localparam [31:0] DAC_CLK = `PLATFORM_DAC_RATE_HZ;   // registers report the sample rate
 localparam [15:0] CH1 = `REG_CH_BASE;
 localparam [15:0] CH2 = `REG_CH_BASE + `REG_CH_STRIDE;
 wire [`CH_WORD_W-1:0] w_ch1 = commit_word[`CH_WORD_W-1:0];

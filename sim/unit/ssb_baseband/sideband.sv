@@ -7,8 +7,9 @@
 
 // End-to-end SSB quality test in the dac_clk domain with the real platform
 // constants (16 kS/s audio, x3375 CIC, 127-tap Hilbert): ssb_baseband fed from
-// a testbench FIFO model with a 2 kHz tone, feeding dds_channel in
-// WAVE_SSB_USB / WAVE_SSB_LSB on a 1.6875 MHz carrier. Hann-windowed Goertzel
+// a testbench FIFO model with a 2 kHz tone, feeding dds_channel (with the
+// platform's samples_per_clock, every sample of every lane is analysed) in
+// WAVE_SSB_USB / WAVE_SSB_LSB on an f_dac/32 carrier. Hann-windowed Goertzel
 // filters at fc+fm, fc-fm and fc over a 2 ms window measure the wanted
 // sideband, the unwanted sideband and the carrier: the unwanted sideband and
 // the carrier must each be >= 35 dB down, and the wanted tone must have the
@@ -18,13 +19,14 @@ module main();
 
 localparam LOG_LEVEL = `DEFAULT_LOG_LEVEL;
 localparam real    PI     = 3.14159265358979;
-localparam real    FDAC   = `PLATFORM_DAC_CLK_HZ;
+localparam integer PHASES = `PLATFORM_DAC_PHASES;
+localparam real    FDAC   = `PLATFORM_DAC_RATE_HZ;   // samples per second (PHASES per clk)
 localparam real    FAUDIO = `PLATFORM_SSB_AUDIO_RATE_HZ;
 localparam real    FM     = 2000.0;
 localparam real    FC     = FDAC / 32.0;
 localparam [31:0]  FTW    = 32'h0800_0000;           // 2^32 / 32
 localparam real    AMP    = 24000.0;                 // of 32767
-localparam integer NWIN   = 108000;                  // 2 ms at 54 MHz
+localparam integer NWIN   = `PLATFORM_DAC_RATE_HZ / 500;   // samples in 2 ms
 localparam integer FILL   = 160 * `PLATFORM_SSB_INTERP;  // 160 audio samples: 127-tap FIR + limiter look-ahead + DC block + CIC settle
 
 reg clk = 0, rst_n = 0;
@@ -51,7 +53,7 @@ ssb_baseband dut (
 );
 
 reg [3:0] waveform = `WAVE_SSB_USB;
-wire [13:0] dac_code;
+wire [14*PHASES-1:0] dac_code;
 dds_channel chan (
     .clk(clk), .rst_n(rst_n), .en(1'b1), .invert(1'b0),
     .ftw(FTW), .phase_ofs(16'd0), .amplitude(16'hFFFF), .offset(16'd0),
@@ -66,19 +68,21 @@ string str;
 // Hann-windowed Goertzel magnitude (in DAC LSB amplitude) at freq over NWIN samples
 task automatic measure(output real a_usb, output real a_lsb, output real a_car);
     real c_u, c_l, c_c, s0u, s1u, s2u, s0l, s1l, s2l, s0c, s1c, s2c, w, x, pu, pl, pc;
-    integer n;
+    integer n, k;
     begin
         c_u = 2.0 * $cos(2.0 * PI * (FC + FM) / FDAC);
         c_l = 2.0 * $cos(2.0 * PI * (FC - FM) / FDAC);
         c_c = 2.0 * $cos(2.0 * PI * FC / FDAC);
         s1u = 0; s2u = 0; s1l = 0; s2l = 0; s1c = 0; s2c = 0;
-        for (n = 0; n < NWIN; n = n + 1) begin
+        for (n = 0; n < NWIN; n = n + PHASES) begin
             @(posedge clk); #2;
-            w = 0.5 - 0.5 * $cos(2.0 * PI * n / NWIN);
-            x = w * ($signed({1'b0, dac_code}) - 8192);
-            s0u = x + c_u * s1u - s2u; s2u = s1u; s1u = s0u;
-            s0l = x + c_l * s1l - s2l; s2l = s1l; s1l = s0l;
-            s0c = x + c_c * s1c - s2c; s2c = s1c; s1c = s0c;
+            for (k = 0; k < PHASES; k = k + 1) begin        // lane 0 is the earlier sample
+                w = 0.5 - 0.5 * $cos(2.0 * PI * (n + k) / NWIN);
+                x = w * ($signed({1'b0, dac_code[14*k +: 14]}) - 8192);
+                s0u = x + c_u * s1u - s2u; s2u = s1u; s1u = s0u;
+                s0l = x + c_l * s1l - s2l; s2l = s1l; s1l = s0l;
+                s0c = x + c_c * s1c - s2c; s2c = s1c; s1c = s0c;
+            end
         end
         pu = s1u * s1u + s2u * s2u - c_u * s1u * s2u;
         pl = s1l * s1l + s2l * s2l - c_l * s1l * s2l;
