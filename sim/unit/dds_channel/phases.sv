@@ -18,7 +18,10 @@
 // 2*step add wraps) and FM with a deviation that makes the step wrap. Except
 // for DC the match must be unique (a swapped lane pair would otherwise hide
 // behind a one-sample offset). Then a disabled channel must park both lanes at
-// mid-scale.
+// mid-scale. Finally the SKEW correction (lane_skew): the serial product
+// must equal ftw * skew / 65536 (truncated toward zero, 64-bit reference),
+// the odd lane must lead the even one by exactly ftw + that, for positive,
+// negative and extreme values, and skew 0 must restore the exact stream.
 
 module main();
 
@@ -35,18 +38,19 @@ reg [31:0] ftw = 32'h0123_4567;
 reg [15:0] phase_ofs = 0, amplitude = 16'hFFFF, offset = 0, duty = 16'h8000, modparam = 0;
 reg [3:0]  waveform = `WAVE_SINE;
 reg signed [15:0] bb_i = 0, bb_q = 0;
+reg [15:0] skew = 16'd0;
 
 wire [13:0] code1;
 wire [27:0] code2;
 dds_channel #(.PHASES(1)) ref1 (
     .clk(clk2), .rst_n(rst_n), .en(en), .invert(invert),
     .ftw(ftw), .phase_ofs(phase_ofs), .amplitude(amplitude), .offset(offset),
-    .waveform(waveform), .duty(duty), .modparam(modparam), .bb_i(bb_i), .bb_q(bb_q), .dac_code(code1)
+    .waveform(waveform), .duty(duty), .modparam(modparam), .lane_skew(16'sd0), .bb_i(bb_i), .bb_q(bb_q), .dac_code(code1)
 );
 dds_channel #(.PHASES(2)) dut2 (
     .clk(clk), .rst_n(rst_n), .en(en), .invert(invert),
     .ftw(ftw), .phase_ofs(phase_ofs), .amplitude(amplitude), .offset(offset),
-    .waveform(waveform), .duty(duty), .modparam(modparam), .bb_i(bb_i), .bb_q(bb_q), .dac_code(code2)
+    .waveform(waveform), .duty(duty), .modparam(modparam), .lane_skew(skew), .bb_i(bb_i), .bb_q(bb_q), .dac_code(code2)
 );
 
 string module_name;
@@ -110,6 +114,34 @@ task automatic scenario(input string label, input integer unique_req);
     end
 endtask
 
+// expected odd-lane correction: ftw * skew / 65536, truncated toward zero
+function automatic [31:0] exp_delta(input [31:0] f, input [15:0] sk);
+    reg [63:0] p; reg [15:0] mag;
+    begin
+        mag = sk[15] ? (16'd0 - sk) : sk;
+        p = {32'd0, f} * {48'd0, mag};
+        exp_delta = sk[15] ? (32'd0 - p[47:16]) : p[47:16];
+    end
+endfunction
+
+task automatic skew_case(input [31:0] f, input [15:0] sk);
+    reg [31:0] d, lead;
+    begin
+        ftw = f; skew = sk;
+        repeat (30) @(posedge clk); #2;
+        d = exp_delta(f, sk);
+        lead = dut2.g_acc2.ph_o - dut2.g_acc2.ph_e;
+        if (dut2.g_acc2.skew_delta !== d || lead !== f + d) begin
+            $sformat(str, "skew %0d at ftw %h: delta %h (expected %h), odd lead %h (expected %h)",
+                     $signed(sk), f, dut2.g_acc2.skew_delta, d, lead, f + d);
+            logger.error(module_name, str); errors = errors + 1;
+        end else begin
+            $sformat(str, "skew %0d at ftw %h: odd lane leads by ftw + %0d", $signed(sk), f, $signed(d));
+            logger.info(module_name, str);
+        end
+    end
+endtask
+
 initial begin
     errors = 0;
 `ifdef ENABLE_DUMPVARS
@@ -144,6 +176,17 @@ initial begin
     scenario("FM, step wrapping past 2^31", 1);
     waveform = `WAVE_DC; ftw = 32'h0123_4567; offset = 16'd1234; bb_i = 0; modparam = 0;
     scenario("DC", 0);
+
+    // SKEW correction
+    waveform = `WAVE_SINE; offset = 0; bb_i = 0; modparam = 0; en = 1;
+    skew_case(32'h0123_4567, 16'd1130);
+    skew_case(32'h7E54_3211, -16'sd1130);
+    skew_case(32'hFFFF_FFFF, 16'h7FFF);
+    skew_case(32'h8000_0000, 16'h8000);
+    skew_case(32'h0000_0001, 16'hFFFF);
+    skew = 0;
+    waveform = `WAVE_SSB_USB; ftw = 32'h0456_789B; bb_i = 16'sd12000; bb_q = -16'sd7000;
+    scenario("SSB USB after skew back to 0", 1);
 
     // disabled: both lanes at mid-scale
     en = 0;

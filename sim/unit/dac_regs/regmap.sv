@@ -121,6 +121,7 @@ initial begin
     expect_reg("ch1 waveform default",  CH1 + `REG_CH_WAVEFORM,  {12'd0, `WAVE_SINE});
     expect_reg("unmapped 0x08",         16'h0008,                16'h0000);
     expect_reg("ch1 modparam default",  CH1 + `REG_CH_MODPARAM,  16'h0000);
+    expect_reg("ch2 skew default",      CH2 + `REG_CH_SKEW,      16'h0000);
     expect_reg("ch1 reserved +8",       CH1 + 16'h0008,          16'h0000);
 
     // SSB / FIFO registers and the audio write window
@@ -153,6 +154,8 @@ initial begin
     wr(CH2 + `REG_CH_AMPLITUDE, 16'h8000);
     wr(CH2 + `REG_CH_WAVEFORM, 16'hFFF1);  // only [3:0] kept
     wr(CH2 + `REG_CH_MODPARAM, 16'h1234);
+    wr(CH1 + `REG_CH_SKEW, 16'hFB96);     // -1130
+    wr(CH2 + `REG_CH_SKEW, 16'h046A);     // +1130
     wr(`REG_CONTROL, 16'h000B);
     expect_reg("ch1 FTW_LO", CH1 + `REG_CH_FTW_LO, 16'h5678);
     expect_reg("ch1 FTW_HI", CH1 + `REG_CH_FTW_HI, 16'h1234);
@@ -161,6 +164,8 @@ initial begin
     expect_reg("ch2 OFFSET", CH2 + `REG_CH_OFFSET, 16'hFC18);
     expect_reg("ch2 WAVEFORM masked", CH2 + `REG_CH_WAVEFORM, 16'h0001);
     expect_reg("ch2 MODPARAM", CH2 + `REG_CH_MODPARAM, 16'h1234);
+    expect_reg("ch1 SKEW", CH1 + `REG_CH_SKEW, 16'hFB96);
+    expect_reg("ch2 SKEW", CH2 + `REG_CH_SKEW, 16'h046A);
     expect_reg("CONTROL", `REG_CONTROL, 16'h000B);
     wr(`REG_ID, 16'hDEAD);
     expect_reg("ID is read-only", `REG_ID, `ACM9767_ID);
@@ -195,7 +200,8 @@ initial begin
         logger.error(module_name, str); errors++;
     end
     if (`CH_OFFSET(w_ch2) !== 16'hFC18 || `CH_AMPLITUDE(w_ch2) !== 16'h8000 || `CH_WAVEFORM(w_ch2) !== 4'd1 ||
-        `CH_FTW(w_ch2) !== 32'h0 || `CH_MODPARAM(w_ch2) !== 16'h1234) begin
+        `CH_FTW(w_ch2) !== 32'h0 || `CH_MODPARAM(w_ch2) !== 16'h1234 ||
+        `CH_SKEW(w_ch1) !== 16'hFB96 || `CH_SKEW(w_ch2) !== 16'h046A) begin
         $sformat(str, "ch2 word mismatch: ftw=%h off=%h amp=%h wave=%0d",
                  `CH_FTW(w_ch2), `CH_OFFSET(w_ch2), `CH_AMPLITUDE(w_ch2), `CH_WAVEFORM(w_ch2));
         logger.error(module_name, str); errors++;

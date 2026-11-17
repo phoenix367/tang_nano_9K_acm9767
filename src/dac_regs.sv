@@ -19,7 +19,7 @@
 //   0x0A AUDIO_RATE (RO, Hz)       0x0B FIFO_DEPTH (RO)
 //   0x0100..0x017F audio FIFO write window (WO): every write pushes one sample
 //   0x10.. channel 1, 0x20.. channel 2: FTW_LO FTW_HI PHASE AMPLITUDE OFFSET
-//   WAVEFORM DUTY MODPARAM
+//   WAVEFORM DUTY MODPARAM SKEW
 // Unmapped addresses inside ADDR_LIMIT read 0 and ignore writes.
 
 module dac_regs (
@@ -63,6 +63,7 @@ reg [15:0] offset    [0:1];
 reg [3:0]  waveform  [0:1];
 reg [15:0] duty      [0:1];
 reg [15:0] modparam  [0:1];
+reg [15:0] skew      [0:1];
 
 reg commit_pending;
 assign commit_busy    = commit_pending | cdc_busy;
@@ -100,7 +101,7 @@ end
 // packed channel word
 function [`CH_WORD_W-1:0] pack_ch(input integer c);
     begin
-        pack_ch = {ftw[c], phase[c], amplitude[c], offset[c], waveform[c], duty[c], modparam[c]};
+        pack_ch = {skew[c], ftw[c], phase[c], amplitude[c], offset[c], waveform[c], duty[c], modparam[c]};
     end
 endfunction
 
@@ -123,6 +124,7 @@ always @(posedge clk or negedge rst_n) begin
             waveform[i]  <= `WRAP_SIM(#1) `WAVE_SINE;
             duty[i]      <= `WRAP_SIM(#1) 16'h8000;   // 50 %
             modparam[i]  <= `WRAP_SIM(#1) 16'd0;
+            skew[i]      <= `WRAP_SIM(#1) 16'd0;
         end
     end else begin
         be_ready     <= `WRAP_SIM(#1) accept;
@@ -143,6 +145,7 @@ always @(posedge clk or negedge rst_n) begin
                     `REG_CH_WAVEFORM:  be_rdata <= `WRAP_SIM(#1) {12'd0, waveform[ch_sel]};
                     `REG_CH_DUTY:      be_rdata <= `WRAP_SIM(#1) duty[ch_sel];
                     `REG_CH_MODPARAM:  be_rdata <= `WRAP_SIM(#1) modparam[ch_sel];
+                    `REG_CH_SKEW:      be_rdata <= `WRAP_SIM(#1) skew[ch_sel];
                     default:           be_rdata <= `WRAP_SIM(#1) 16'h0000;
                 endcase
             end else begin
@@ -176,6 +179,7 @@ always @(posedge clk or negedge rst_n) begin
                     `REG_CH_WAVEFORM:  waveform[ch_sel]   <= `WRAP_SIM(#1) be_wdata[3:0];
                     `REG_CH_DUTY:      duty[ch_sel]       <= `WRAP_SIM(#1) be_wdata;
                     `REG_CH_MODPARAM:  modparam[ch_sel]   <= `WRAP_SIM(#1) be_wdata;
+                    `REG_CH_SKEW:      skew[ch_sel]       <= `WRAP_SIM(#1) be_wdata;
                     default: ;
                 endcase
             end else begin

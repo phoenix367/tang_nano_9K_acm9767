@@ -110,6 +110,7 @@ scripts/acm9767_ctl.py stream --tone 700 --tone2 1900 --level 0.45      # two-to
 scripts/acm9767_ctl.py stream --carrier 1e6 --mode am --depth 0.8 --wav voice.wav    # AM
 scripts/acm9767_ctl.py stream --carrier 10.7e6 --mode nfm --tone 1000            # NFM, 5 kHz deviation
 scripts/acm9767_ctl.py set 1 --freq 1e6 --wave am --depth 0.5                    # mode without streaming
+scripts/acm9767_ctl.py skew 1 1130          # even/odd skew calibration (raw, or --ps 160); `skew 1` shows it
 ```
 
 ![Simulated USB spectrum, 7 MHz carrier, seven tones](doc/images/ssb_spectrum_7mhz_multitone.png)
@@ -170,7 +171,7 @@ the bitstream was built with.
 | Addr | Name        | R/W | Meaning                                                        |
 | ---- | ----------- | --- | -------------------------------------------------------------- |
 | 0x00 | ID          | R   | 0x9767                                                         |
-| 0x01 | VERSION     | R   | 0x0100 (major.minor)                                           |
+| 0x01 | VERSION     | R   | 0x0101 (major.minor; 1.1 added the SKEW register)              |
 | 0x02 | STATUS      | R   | bit0 PLL locked, bit1 commit pending/in flight                 |
 | 0x03 | CONTROL     | RW* | bit0/1 enable ch1/ch2, bit2/3 invert ch1/ch2                   |
 | 0x04 | COMMIT      | W   | any write applies the staged bank; reads bit0 = busy           |
@@ -193,7 +194,12 @@ sideband, 7 AM, 8 FM -- modes 5..8 use the channel's FTW as the carrier and the
 streamed audio as baseband), +6 `DUTY` (square high threshold, 0x8000 = 50 %),
 +7 `MODPARAM` (AM: depth, 0xFFFF = 100 %; FM: peak deviation at full-scale
 audio in units of 256 FTW steps, i.e. Hz x 2^32 / f_dac / 256 -- 5 kHz at
-108 MS/s is 777). AM puts the unmodulated carrier at half scale so 100 % depth
+108 MS/s is 777), +8 `SKEW` (signed, 2^-16 of a sample: advances the phase of
+every odd DAC sample by FTW x SKEW / 65536 to cancel a fixed timing skew between
+the even and odd samples of the 108 MS/s serializer output; calibrate it per
+board with `acm9767_ctl.py skew` by minimising the f_dac/2 - f spur -- on the
+reference bench it did not help, so leave it at 0 unless a stable null shows
+up; no effect on 54 MS/s builds; `set` leaves it alone). AM puts the unmodulated carrier at half scale so 100 % depth
 peaks at full scale. `*` = staged until COMMIT. Addresses up to 0x17F are valid; anything else returns a
 Modbus illegal-address exception.
 

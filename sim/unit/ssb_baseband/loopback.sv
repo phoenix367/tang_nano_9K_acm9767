@@ -62,7 +62,7 @@ wire [14*PHASES-1:0] dac_code;
 dds_channel #(.PHASES(PHASES)) chan (
     .clk(clk), .rst_n(rst_n), .en(1'b1), .invert(1'b0),
     .ftw(ftw), .phase_ofs(16'd0), .amplitude(16'hFFFF), .offset(16'd0),
-    .waveform(waveform), .duty(16'h8000), .modparam(modparam),
+    .waveform(waveform), .duty(16'h8000), .modparam(modparam), .lane_skew(16'sd0),
     .bb_i(bb_i), .bb_q(bb_q), .dac_code(dac_code)
 );
 

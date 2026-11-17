@@ -38,9 +38,10 @@
 `define REG_CH_WAVEFORM   16'h0005
 `define REG_CH_DUTY       16'h0006
 `define REG_CH_MODPARAM   16'h0007   // AM depth (Q16, 0xFFFF = 100 %) or FM deviation (x256 FTW units)
+`define REG_CH_SKEW       16'h0008   // signed, 2^-16 sample: odd-sample phase advance (two-samples-per-clock builds)
 
 `define ACM9767_ID        16'h9767
-`define ACM9767_VERSION   16'h0100
+`define ACM9767_VERSION   16'h0101   // 1.1: per-channel SKEW register
 
 // CONTROL register bits
 `define CTRL_CH1_EN       0
@@ -55,6 +56,9 @@
 // ---- packed per-channel control word handed from the sys_clk register file to
 // the dac_clk DDS through cdc_commit_sync. Flat vectors (not a packed struct)
 // so the same slices work under Icarus and Gowin synthesis.
+//   [131:116] skew     signed odd-sample phase advance, skew/65536 of a sample step
+//                      (calibrates the even/odd DAC update skew of the OSER4 output;
+//                      no effect with one sample per clock)
 //   [115:84] ftw       32-bit phase increment (f_out = ftw * f_dac / 2^32)
 //   [83:68]  phase     16-bit phase offset (2*pi / 65536 units)
 //   [67:52]  amplitude 16-bit unsigned, gain = (amplitude+1)/65536, 0xFFFF = unity
@@ -62,7 +66,8 @@
 //   [35:32]  waveform  WAVE_* code
 //   [31:16]  duty      square-wave high threshold (0x8000 = 50 %)
 //   [15:0]   modparam  AM depth (Q16) / FM deviation (modparam*256 FTW at full-scale audio)
-`define CH_WORD_W         116
+`define CH_WORD_W         132
+`define CH_SKEW(w)        w[131:116]
 `define CH_FTW(w)         w[115:84]
 `define CH_PHASE(w)       w[83:68]
 `define CH_AMPLITUDE(w)   w[67:52]

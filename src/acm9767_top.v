@@ -161,7 +161,7 @@ dds_channel #(.PHASES(PHASES)) dds1 (
     .en(ctrl[`CTRL_CH1_EN]), .invert(ctrl[`CTRL_CH1_INVERT]),
     .ftw(`CH_FTW(ch1)), .phase_ofs(`CH_PHASE(ch1)), .amplitude(`CH_AMPLITUDE(ch1)),
     .offset(`CH_OFFSET(ch1)), .waveform(`CH_WAVEFORM(ch1)), .duty(`CH_DUTY(ch1)),
-    .modparam(`CH_MODPARAM(ch1)), .bb_i(bb_i), .bb_q(bb_q),
+    .modparam(`CH_MODPARAM(ch1)), .lane_skew(`CH_SKEW(ch1)), .bb_i(bb_i), .bb_q(bb_q),
     .dac_code(code1)
 );
 dac_output_stage #(.PHASES(PHASES)) out1 (
@@ -177,7 +177,7 @@ dds_channel #(.PHASES(PHASES)) dds2 (
     .en(ctrl[`CTRL_CH2_EN]), .invert(ctrl[`CTRL_CH2_INVERT]),
     .ftw(`CH_FTW(ch2)), .phase_ofs(`CH_PHASE(ch2)), .amplitude(`CH_AMPLITUDE(ch2)),
     .offset(`CH_OFFSET(ch2)), .waveform(`CH_WAVEFORM(ch2)), .duty(`CH_DUTY(ch2)),
-    .modparam(`CH_MODPARAM(ch2)), .bb_i(bb_i), .bb_q(bb_q),
+    .modparam(`CH_MODPARAM(ch2)), .lane_skew(`CH_SKEW(ch2)), .bb_i(bb_i), .bb_q(bb_q),
     .dac_code(code2)
 );
 dac_output_stage #(.PHASES(PHASES)) out2 (

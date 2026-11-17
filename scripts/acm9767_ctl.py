@@ -55,7 +55,9 @@ REG_FIFO_LEVEL, REG_UNDERRUNS, REG_AUDIO_RATE, REG_FIFO_DEPTH = 0x08, 0x09, 0x0A
 REG_AUDIO_BASE = 0x0100          # ..0x017F: FIFO write window
 REG_CH_BASE, REG_CH_STRIDE = 0x10, 0x10
 CH_FTW_LO, CH_FTW_HI, CH_PHASE, CH_AMPLITUDE, CH_OFFSET, CH_WAVEFORM, CH_DUTY, CH_MODPARAM = range(8)
-CH_BLOCK_LEN = 8
+CH_SKEW = 8                      # signed, 2^-16 sample odd-lane phase advance (VERSION >= 0x0101)
+CH_BLOCK_LEN = 8                 # registers `set` writes (FTW_LO..MODPARAM); SKEW is calibration, kept
+SKEW_MIN_VERSION = 0x0101
 ACM9767_ID = 0x9767
 STAT_PLL_LOCK, STAT_COMMIT_BUSY = 0x0001, 0x0002
 WAVEFORMS = {"sine": 0, "triangle": 1, "sawtooth": 2, "square": 3, "dc": 4,
@@ -74,6 +76,20 @@ def ch_base(ch: int) -> int:
 
 
 # ---- unit conversions ----
+def skew_ps_to_reg(ps: float, dac_clk_hz: int) -> int:
+    """Even/odd DAC update skew in ps -> SKEW register (fraction of a sample x 65536)."""
+    reg = int(round(ps * 1e-12 * dac_clk_hz * 65536))
+    if not -32768 <= reg <= 32767:
+        raise ValueError(f"skew {ps} ps is outside +-{32767 / 65536 / dac_clk_hz * 1e12:.0f} ps")
+    return reg
+
+
+def skew_reg_to_ps(reg: int, dac_clk_hz: int) -> float:
+    reg &= 0xFFFF                                   # accepts a raw register or a signed int
+    reg = reg - 0x10000 if reg & 0x8000 else reg
+    return reg / 65536 / dac_clk_hz * 1e12
+
+
 def freq_to_ftw(freq_hz: float, dac_clk_hz: int) -> int:
     if not (0 <= freq_hz < dac_clk_hz / 2):
         raise ValueError(f"frequency {freq_hz} Hz outside 0..{dac_clk_hz / 2:.0f} Hz (Nyquist)")
@@ -254,6 +270,18 @@ class Acm9767:
     def write_channel(self, ch: int, block: list):
         self.mb.write_multiple(ch_base(ch), block)
 
+    def require_skew(self):
+        ver = self.identify()[1]
+        if ver < SKEW_MIN_VERSION:
+            raise RuntimeError(f"bitstream version {ver >> 8}.{ver & 0xFF} has no SKEW register (needs 1.1)")
+
+    def skew(self, ch: int) -> int:
+        v = self.mb.read_holding(ch_base(ch) + CH_SKEW, 1)[0]
+        return v - 0x10000 if v & 0x8000 else v
+
+    def set_skew(self, ch: int, value: int):
+        self.mb.write_single(ch_base(ch) + CH_SKEW, value & 0xFFFF)
+
 
 # ---- audio sources for `stream` ----
 def tone_samples(rate: int, freqs, level: float, seconds: float):
@@ -331,6 +359,7 @@ def cmd_status(dev: Acm9767, args):
     print(f"status   pll_lock={int(bool(st & STAT_PLL_LOCK))} commit_busy={int(bool(st & STAT_COMMIT_BUSY))}")
     print(f"audio    {dev.audio_rate} S/s, fifo {dev.fifo_level()}/{dev.fifo_depth}, "
           f"underruns {dev.underruns()}")
+    has_skew = ver >= SKEW_MIN_VERSION
     for ch in range(1, dev.channels + 1):
         c = dev.read_channel(ch)
         en = "on " if ctrl & (1 << (ch - 1)) else "off"
@@ -340,6 +369,10 @@ def cmd_status(dev: Acm9767, args):
             extra = f"  depth {c['depth']:.2f}"
         elif c["waveform"] == "fm":
             extra = f"  deviation {c['deviation_hz']:.0f} Hz"
+        if has_skew:
+            sk = dev.skew(ch)
+            if sk:
+                extra += f"  skew {sk:+d} ({skew_reg_to_ps(sk, dev.dac_clk_hz):+.1f} ps)"
         print(f"ch{ch} [{en}]{inv}  {c['waveform']:8s} {c['freq_hz']:14.3f} Hz  amp {c['amplitude']:.4f}  "
               f"offset {c['offset']:+.4f}  phase {c['phase_deg']:7.2f} deg  duty {c['duty']:.3f}{extra}")
 
@@ -413,6 +446,23 @@ def cmd_stream(dev: Acm9767, args):
     print(f"done: {sent} samples ({sent / rate:.2f} s), {under} underruns")
 
 
+def cmd_skew(dev: Acm9767, args):
+    dev.require_channel(args.channel)
+    dev.require_skew()
+    if args.value is None and args.ps is None:
+        sk = dev.skew(args.channel)
+        print(f"ch{args.channel}: skew {sk:+d} ({skew_reg_to_ps(sk, dev.dac_clk_hz):+.1f} ps)")
+        return
+    sk = args.value if args.value is not None else skew_ps_to_reg(args.ps, dev.dac_clk_hz)
+    if not -32768 <= sk <= 32767:
+        raise ValueError(f"skew {sk} outside -32768..32767")
+    dev.set_skew(args.channel, sk)
+    print(f"ch{args.channel}: skew {sk:+d} ({skew_reg_to_ps(sk, dev.dac_clk_hz):+.1f} ps)"
+          + ("" if args.no_commit else ", committed"))
+    if not args.no_commit:
+        dev.commit()
+
+
 def cmd_commit(dev: Acm9767, args):
     dev.commit()
     print("committed")
@@ -471,6 +521,14 @@ def build_parser():
     p.set_defaults(fn=cmd_invert)
 
     sub.add_parser("commit", help="apply the staged registers").set_defaults(fn=cmd_commit)
+
+    p = sub.add_parser("skew", help="show / set the even-odd DAC update skew calibration (108 MS/s builds)")
+    p.add_argument("channel", type=int, choices=(1, 2))
+    g = p.add_mutually_exclusive_group()
+    g.add_argument("value", type=int, nargs="?", help="raw register value, 2^-16 sample (signed)")
+    g.add_argument("--ps", type=float, help="skew in picoseconds (converted with the DAC rate)")
+    p.add_argument("--no-commit", action="store_true")
+    p.set_defaults(fn=cmd_skew)
 
     p = sub.add_parser("stream", help="stream baseband audio (SSB / AM / FM) on channel 1")
     src = p.add_mutually_exclusive_group()

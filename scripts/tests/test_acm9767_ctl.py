@@ -29,15 +29,15 @@ DAC_CLK = 54_000_000
 class FakeSlave:
     """In-memory model of dac_regs behind a Modbus RTU slave (id 7)."""
 
-    def __init__(self, slave=7, dac_clk=DAC_CLK, channels=2):
+    def __init__(self, slave=7, dac_clk=DAC_CLK, channels=2, version=0x0101):
         self.slave = slave
-        self.regs = {0x00: ctl.ACM9767_ID, 0x01: 0x0100, 0x02: 0x0001,
+        self.regs = {0x00: ctl.ACM9767_ID, 0x01: version, 0x02: 0x0001,
                      0x05: dac_clk & 0xFFFF, 0x06: dac_clk >> 16, 0x07: channels, 0x03: 0,
                      0x08: 0, 0x09: 0, 0x0A: 16000, 0x0B: 2048}
         self.audio = []
         for ch in (1, 2):
             b = ctl.ch_base(ch)
-            self.regs.update({b + i: 0 for i in range(8)})
+            self.regs.update({b + i: 0 for i in range(9)})      # + SKEW
             self.regs[b + ctl.CH_AMPLITUDE] = 0xFFFF
             self.regs[b + ctl.CH_DUTY] = 0x8000
         self.committed = None
@@ -192,7 +192,7 @@ def test_modbus_crc_vector():
 
 def test_modbus_rtu_read_uses_transport(slave):
     mb = ModbusRTU(transport=slave)
-    assert mb.read_holding(0x00, 2) == [ctl.ACM9767_ID, 0x0100]
+    assert mb.read_holding(0x00, 2) == [ctl.ACM9767_ID, 0x0101]
 
 
 def test_single_channel_build_hides_and_rejects_channel_2(capsys):
@@ -274,3 +274,35 @@ def test_stream_modes(slave, monkeypatch):
     assert slave.regs[b + ctl.CH_MODPARAM] == round(2500 * 2**32 / DAC_CLK / 256)
     run(slave, "stream", "--carrier", "1e6", "--lsb", "--seconds", "0.01")
     assert slave.regs[b + ctl.CH_WAVEFORM] == 6
+
+
+def test_skew_command(slave, capsys):
+    b = ctl.ch_base(1)
+    out = run(slave, "skew", "1", "--ps", "160", capsys=capsys)
+    assert slave.regs[b + ctl.CH_SKEW] == round(160e-12 * DAC_CLK * 65536)
+    assert slave.commits == 1 and slave.committed[b + ctl.CH_SKEW] == slave.regs[b + ctl.CH_SKEW]
+    assert "committed" in out
+    run(slave, "skew", "1", "-1130")
+    assert slave.regs[b + ctl.CH_SKEW] == (-1130) & 0xFFFF
+    out = run(slave, "skew", "1", capsys=capsys)
+    assert "skew -1130" in out and "ps" in out
+    # `set` rewrites FTW..MODPARAM only: the calibration survives it
+    run(slave, "set", "1", "--freq", "1e6")
+    assert slave.regs[b + ctl.CH_SKEW] == (-1130) & 0xFFFF
+    out = run(slave, "status", capsys=capsys)
+    assert "skew -1130" in out
+    with pytest.raises(SystemExit):
+        run(slave, "skew", "1", "--ps", "1e6")          # beyond +-0.5 sample
+
+
+def test_skew_needs_new_bitstream(capsys):
+    old = FakeSlave(version=0x0100)
+    with pytest.raises(SystemExit) as e:
+        run(old, "skew", "1", "100")
+    assert "SKEW" in str(e.value)
+    assert old.regs[ctl.ch_base(1) + ctl.CH_SKEW] == 0
+
+
+def test_skew_conversions():
+    assert ctl.skew_ps_to_reg(160, 108_000_000) == round(160e-12 * 108e6 * 65536)
+    assert abs(ctl.skew_reg_to_ps(ctl.skew_ps_to_reg(-160, 108_000_000), 108_000_000) + 160) < 0.2

@@ -35,7 +35,7 @@ DataLogger #(.verbosity(LOG_LEVEL)) logger();
 dds_channel #(.PHASES(1)) dut (
     .clk(clk), .rst_n(rst_n), .en(en), .invert(invert),
     .ftw(ftw), .phase_ofs(phase_ofs), .amplitude(amplitude), .offset(offset),
-    .waveform(waveform), .duty(duty), .modparam(modparam), .bb_i(bb_i), .bb_q(16'sd0), .dac_code(dac_code)
+    .waveform(waveform), .duty(duty), .modparam(modparam), .lane_skew(16'sd0), .bb_i(bb_i), .bb_q(16'sd0), .dac_code(dac_code)
 );
 
 always #9.26 clk = ~clk;   // 54 MHz
